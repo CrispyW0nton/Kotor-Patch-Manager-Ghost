@@ -1,0 +1,2 @@
+# DLL-only patch. KPatchCore treats a patch with no [[hooks]] entries and a
+# packaged binary as a DLL-only patch, then loads it after dependencies.

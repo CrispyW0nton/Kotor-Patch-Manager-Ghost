@@ -21,6 +21,7 @@ mono_crash.*
 
 # Claude
 .claude/
+.tools/
 
 # patch Results
 *.kpatch

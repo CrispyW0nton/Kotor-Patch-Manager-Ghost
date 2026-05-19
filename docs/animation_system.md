@@ -1,0 +1,124 @@
+# Animation System Investigation
+
+Issue #98 asks for four things: how the animation system works, what the current limits are, why those limits exist, and how to work around them. This document captures the first K1 pass from the local address database and turns it into a patch plan.
+
+## Summary
+
+The practical limit is not the MDL format and not `animations.2da` row count. Models can carry additional named animations, and `animations.2da` is already treated as a 16-bit row space. The limiting layer is the engine code that decides which animation name or animation row to request for combat, dialog, cutscenes, force powers, and other gameplay actions.
+
+The recommended shape is a small `CustomAnimationCore` patch that exposes a registry to downstream patches, then detours the engine consumers that build or resolve animation names. K1 should be the first target because its address database already has the relevant symbols. K2 support should follow once the matching K2 functions are labelled.
+
+## Confirmed K1 Address-Database Entries
+
+These entries were checked against `AddressDatabases/kotor1_0_3.db`.
+
+| Area | Symbol | Address | Convention | Stack params |
+|---|---|---:|---|---:|
+| 2DA load | `CTwoDimArrays::Load2DArrays_Animations` | `0x005c32e0` | `__thiscall` | `0` |
+| 2DA load | `CTwoDimArrays::Load2DArrays_DialogAnimations` | `0x005c3bf0` | `__thiscall` | `0` |
+| 2DA load | `CTwoDimArrays::Load2DArrays_CombatAnimations` | `0x005c3b50` | `__thiscall` | `0` |
+| Client resolver | `CClientExoApp::GetClientMeleeAnimation` | `0x005edce0` | `__thiscall` | `24` |
+| Client resolver | `CClientExoApp::GetClientRangedAnimation` | `0x005edcc0` | `__thiscall` | `16` |
+| Client resolver | `CClientExoAppInternal::GetClientMeleeAnimation` | `0x005f32e0` | `__thiscall` | `24` |
+| Client resolver | `CClientExoAppInternal::GetClientRangedAnimation` | `0x005f33f0` | `__thiscall` | `16` |
+| Server resolver | `CSWSCreature::ResolveMeleeAnimations` | `0x005b7470` | `__thiscall` | `20` |
+| Server resolver | `CSWSCreature::ResolveRangedAnimations` | `0x005b6c40` | `__thiscall` | `12` |
+| Playback | `Gob::PlayAnimation` | `0x00485bd0` | `__thiscall` | `16` |
+| Playback | `Gob::PlayOutOfOrderAnimation` | `0x00485130` | `__thiscall` | `20` |
+| Playback | `Gob::LoadAddInAnimations` | `0x00440890` | `__thiscall` | `4` |
+| Playback | `Gob::RemoveAddInAnimations` | `0x0044b2c0` | `__thiscall` | `0` |
+| Playback tick | `Gob::Animate` | `0x00486670` | `__thiscall` | `4` |
+| Anim bridge | `CSWCAnimBase::SetAnimation` | `0x0069d4f0` | `__thiscall` | `16` |
+| Anim bridge | `CSWCAnimBase::SetOverlayAnimation` | `0x0069e420` | `__thiscall` | `12` |
+| Anim bridge | `CSWCAnimBase::AnimationExists` | `0x0069d910` | `__thiscall` | `2` |
+| Anim bridge | `CSWCAnimBase::GetAnimationLength` | `0x0069d250` | `__thiscall` | `2` |
+| Anim bridge | `CSWCAnimBase::GetAnimationName` | `0x0069e620` | `__thiscall` | `6` |
+
+Important offsets:
+
+| Class | Member | Offset | Type |
+|---|---|---:|---|
+| `CTwoDimArrays` | `animations` | `0x3c` | `C2DA *` |
+| `CTwoDimArrays` | `dialoganimations` | `0x40` | `C2DA *` |
+| `CTwoDimArrays` | `combatanimations` | `0x78` | `C2DA *` |
+| `Animation` | `max_tree` | `0x0` | `MaxTree` |
+| `AnimRun` | `animation` | `0x0` | `Animation *` |
+| `CSWCAnimBase` | `gob` | `0xb8` | `Gob *` |
+| `CSWSCombatRoundAction` | `animation_id` | `0x4` | `ushort` |
+| `CSWSCombatRoundAction` | `animation` | `0x78` | `int` |
+| `CSWSCombatAttackData` | `reaxn_animation` | `0x12` | `ushort` |
+| `CSWSDialogAnimation` | `animation` | `0x8` | `ushort` |
+| `CSWSDialogCamera` | `camera_animation` | `0x18` | `ushort` |
+| `CSWCObject` | `looping_animation` | `0x58` | `ushort` |
+| `CSWSObject` | `animation` | `0xd4` | `int` |
+
+## Current Limits
+
+| Layer | Limit | Notes |
+|---|---|---|
+| MDL model animation list | No fixed cap identified in this pass | The engine exposes dynamic animation structures, and the bottleneck appears after load, at consumer lookup time. |
+| `animations.2da` | `65536` rows | Recorded in `docs/2da_row_limits.md`; enough for practical use. |
+| `dialoganimations.2da` | `65536` rows | Also recorded in `docs/2da_row_limits.md`; row values are often masked as 16-bit. |
+| `combatanimations.2da` | Effectively `uint32` | Recorded in `docs/2da_row_limits.md`. |
+| Engine animation fields | Often `ushort` | Several combat/dialog/camera fields store animation IDs as 16-bit values. Widening these is high risk and probably unnecessary. |
+| Gameplay consumers | Hardcoded | Combat, dialog, force-power, and cutscene paths only request the names/IDs their compiled logic knows how to build. |
+
+## Cause
+
+The data side can represent more animation names than the gameplay side asks for. The engine commonly reaches an animation by building or selecting a known animation key, resolving that through the 2DA/model path, and then passing the result to the `CSWCAnimBase`/`Gob` playback layer. New animation rows and model clips can exist, but a new gameplay tuple is invisible until a consumer is patched to ask for it.
+
+That means Issue #98 is best treated as a consumer-resolution problem, not a raw model-capacity problem.
+
+## Proposed Patch Plan
+
+### Tier 1: Documentation
+
+Keep this file as the public investigation artifact for Issue #98. Expand it as each resolver body is inspected in Ghidra.
+
+### Tier 2: Registry API
+
+Scaffolded in `Patches/CustomAnimationCore`.
+
+The registry exports:
+
+- `RegisterAnimation(const char* name) -> uint16_t`
+- `RegisterAnimationWithId(const char* name, uint16_t id) -> bool`
+- `MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName) -> bool`
+- `LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) -> const char*`
+- `LookupAnimationId(const char* name) -> uint16_t`
+- `ClearCustomAnimationRegistry() -> void`
+
+Dynamic IDs currently begin at `65000`, leaving room under the `0xffff` invalid/sentinel value while staying above vanilla-style content.
+
+### Tier 3: Loader Hook
+
+Detour `CTwoDimArrays::Load2DArrays_Animations` after its Ghidra body is confirmed. The goal is to merge registered names into the loaded animation table or otherwise make name-to-ID lookups see registry entries.
+
+Open questions:
+
+- Whether the existing `C2DA` wrapper exposes enough mutation surface, or a new wrapper is needed.
+- Whether registry data should be populated before or after the 2DA loader depending on DLL load order.
+- Whether deterministic IDs should be fixed in TOML for release patches rather than allocated by first registration order.
+
+### Tier 4: Resolver Hooks
+
+Start with the client-side resolver path:
+
+- `CClientExoAppInternal::GetClientMeleeAnimation`
+- `CClientExoAppInternal::GetClientRangedAnimation`
+
+The detour should check `(weaponType, actionKind)` in the registry and fall back to vanilla logic on a miss. Server-side resolver hooks should be treated as a second pass because they have higher gameplay and save-compatibility risk.
+
+Prototype note: the first implementation hooks the fallback/default epilogues in `CSWCCreature::UpdateMeleeAttackData` at `0x0061406c` and `CSWCCreature::UpdateRangedAttackData` at `0x0061428c`. This is narrower than replacing the client resolver. It catches unhandled/default tuples, swaps `ESI` to the mapped animation ID, and then lets the original return sequence move that value into `EAX`.
+
+### Tier 5: Demo Patch
+
+Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.
+
+## Issue Comment Draft
+
+I am planning to tackle #98 as a K1-first investigation/prototype, then carry it to K2 once the matching K2 resolver symbols are in the address databases.
+
+My current read is that the hard limit is not the MDL animation list and not `animations.2da`; `animations.2da` already has a 65,536-row space. The limit is in the engine consumers that decide which animation name or row to request. The K1 DB already has the main stack labelled: `CTwoDimArrays::Load2DArrays_Animations` at `0x005c32e0`, client melee/ranged resolvers at `0x005f32e0`/`0x005f33f0`, server melee/ranged resolvers at `0x005b7470`/`0x005b6c40`, and the `CSWCAnimBase`/`Gob` playback layer.
+
+Proposed deliverable: a small `CustomAnimationCore` patch that exports a registry for `animation name -> uint16 id` and `(weaponType, actionKind) -> animation name`, then detours the client resolver path to consult that registry before falling back to vanilla behavior. The loader hook and 2DA mutation details need Ghidra confirmation before I commit hook bytes. I have started the repo-side docs and scaffold on `codex/issue-98-custom-animations`.

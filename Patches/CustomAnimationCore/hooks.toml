@@ -1,0 +1,46 @@
+# Issue #98 K1 prototype hooks.
+#
+# These first hooks target the shared fallback epilogues in the client-side
+# attack animation ID resolvers. They let vanilla compute an animation ID, then
+# allow CustomAnimationCore to swap ESI before the original MOV EAX, ESI return
+# sequence executes.
+
+# CSWCCreature::UpdateMeleeAttackData fallback/default epilogue.
+[[hooks]]
+address = 0x0061406c
+type = "detour"
+function = "OverrideMeleeDefaultAnimationId"
+original_bytes = [0x5f, 0x8b, 0xc6, 0x5e, 0x5b, 0xc2, 0x10, 0x00]
+exclude_from_restore = ["esi"]
+
+[[hooks.parameters]]
+source = "esi"
+type = "uint" # Vanilla animation id.
+
+[[hooks.parameters]]
+source = "esp+16"
+type = "pointer" # UpdateMeleeAttackData param_1.
+
+[[hooks.parameters]]
+source = "esp+28"
+type = "pointer" # UpdateMeleeAttackData param_4.
+
+# CSWCCreature::UpdateRangedAttackData fallback/default epilogue.
+[[hooks]]
+address = 0x0061428c
+type = "detour"
+function = "OverrideRangedDefaultAnimationId"
+original_bytes = [0x8b, 0xc6, 0x5e, 0xc2, 0x08, 0x00]
+exclude_from_restore = ["esi"]
+
+[[hooks.parameters]]
+source = "esi"
+type = "uint" # Vanilla animation id.
+
+[[hooks.parameters]]
+source = "esp+8"
+type = "pointer" # UpdateRangedAttackData param_1.
+
+[[hooks.parameters]]
+source = "esp+12"
+type = "pointer" # UpdateRangedAttackData param_2.

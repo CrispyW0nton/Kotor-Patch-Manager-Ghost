@@ -1,0 +1,10 @@
+LIBRARY CustomAnimationCore
+EXPORTS
+    RegisterAnimation
+    RegisterAnimationWithId
+    MapWeaponAction
+    LookupRegisteredAnim
+    LookupAnimationId
+    ClearCustomAnimationRegistry
+    OverrideMeleeDefaultAnimationId
+    OverrideRangedDefaultAnimationId
