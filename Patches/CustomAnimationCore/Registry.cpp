@@ -33,12 +33,17 @@ uint16_t CustomAnimationRegistry::RegisterAnimation(const char* name) {
         return existing->second;
     }
 
+    while (nextId != InvalidAnimationId && idToName.find(nextId) != idToName.end()) {
+        ++nextId;
+    }
+
     if (nextId == InvalidAnimationId) {
         return InvalidAnimationId;
     }
 
     const uint16_t id = nextId++;
     nameToId.emplace(key, id);
+    idToName.emplace(id, key);
     return id;
 }
 
@@ -55,7 +60,13 @@ bool CustomAnimationRegistry::RegisterAnimationWithId(const char* name, uint16_t
         return existing->second == id;
     }
 
+    auto existingId = idToName.find(id);
+    if (existingId != idToName.end() && existingId->second != key) {
+        return false;
+    }
+
     nameToId.emplace(key, id);
+    idToName.emplace(id, key);
     if (id >= nextId && id < InvalidAnimationId) {
         nextId = static_cast<uint16_t>(id + 1);
     }
@@ -67,7 +78,7 @@ bool CustomAnimationRegistry::MapWeaponAction(uint8_t weaponType, uint8_t action
         return false;
     }
 
-    const uint16_t id = RegisterAnimation(animName);
+    const uint16_t id = LookupAnimationId(animName);
     if (id == InvalidAnimationId) {
         return false;
     }
@@ -114,6 +125,7 @@ uint16_t CustomAnimationRegistry::LookupAnimationId(const char* name) {
 void CustomAnimationRegistry::Clear() {
     std::lock_guard<std::mutex> lock(registryMutex);
     nameToId.clear();
+    idToName.clear();
     weaponActionToName.clear();
     nextId = FirstDynamicAnimationId;
 }

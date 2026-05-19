@@ -11,6 +11,15 @@ The first pass exposes a small exported registry that downstream patches can use
 - `LookupAnimationId(const char* name) -> uint16_t`
 - `ClearCustomAnimationRegistry() -> void`
 
+Registry rules for the v0 prototype:
+
+- `RegisterAnimationWithId` is the recommended path until the loader can append
+  rows to `animations.2da`.
+- Registering the same name with the same ID is idempotent.
+- Registering the same name with a different ID fails.
+- Registering a different name with an already-used ID fails.
+- `MapWeaponAction` only accepts names that are already registered.
+
 Resolver keys currently support `0xff` as a wildcard. Lookup order is exact
 match, weapon wildcard, action wildcard, then global wildcard. This exists so
 the smoke-test patch can prove the hook path before the parameter semantics are
@@ -23,7 +32,10 @@ The first K1 prototype hooks the fallback/default return paths in:
 
 When vanilla falls through to those default paths, the hook resolves the raw resolver tuple through `MapWeaponAction` and swaps the returned animation ID if a registered mapping exists. This preserves vanilla hardcoded cases while creating an experimental escape hatch for unhandled tuples.
 
-Until the loader hook can inject rows into `animations.2da`, downstream patches should use `RegisterAnimationWithId` with an ID that is already valid in the active `animations.2da` file.
+Until the loader hook can inject rows into `animations.2da`, downstream patches
+should use `RegisterAnimationWithId` with an ID that is already valid in the
+active `animations.2da` file. `RegisterAnimation` still exists for the future
+loader-backed path, but auto-assigned IDs are not safe for release content yet.
 
 `Patches/CustomAnimationSmokeTest` is the current development harness. It maps
 the global wildcard to K1 row `17` (`victory`) so hook hits are visible in debug

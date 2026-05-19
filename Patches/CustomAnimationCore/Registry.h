@@ -33,5 +33,6 @@ private:
 
     uint16_t nextId = 65000;
     std::unordered_map<std::string, uint16_t> nameToId;
+    std::unordered_map<uint16_t, std::string> idToName;
     std::unordered_map<WeaponActionKey, std::string, WeaponActionKeyHash> weaponActionToName;
 };

@@ -60,13 +60,15 @@ Acceptance:
 
 Goal: make the API safe for real downstream patches.
 
+Status: in progress. The registry now treats `(name, id)` registrations as stable pairs: duplicate same-name/same-ID registration is allowed, same-name/different-ID registration fails, different-name/same-ID registration fails, and resolver mappings require the animation name to be registered first.
+
 Tasks:
 
 - Replace the ambiguous `(uint8 weaponType, uint8 actionKind)` key names with documented resolver-key names once K1 parameter semantics are confirmed.
 - Add separate map families if melee and ranged keys differ.
-- Add deterministic explicit-ID registration as the recommended v0 path.
-- Reserve dynamic auto-ID allocation for after loader/table mutation exists.
-- Add duplicate-registration behavior to the README.
+- Add deterministic explicit-ID registration as the recommended v0 path. Done.
+- Reserve dynamic auto-ID allocation for after loader/table mutation exists. Done in docs and mapping behavior; `RegisterAnimation` remains exported for future loader-backed work.
+- Add duplicate-registration behavior to the README. Done.
 
 Acceptance:
 
