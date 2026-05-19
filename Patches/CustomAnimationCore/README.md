@@ -30,8 +30,17 @@ The first K1 prototype hooks the fallback/default return paths in:
 
 - `CSWCCreature::UpdateMeleeAttackData`
 - `CSWCCreature::UpdateRangedAttackData`
+- `CSWCAnimBase::GetAnimationName`
 
-When vanilla falls through to those default paths, the hook resolves the raw resolver tuple through `MapWeaponAction` and swaps the returned animation ID if a registered mapping exists. This preserves vanilla hardcoded cases while creating an experimental escape hatch for unhandled tuples.
+When vanilla falls through to the combat default paths, the hook resolves the
+raw resolver tuple through `MapWeaponAction` and swaps the returned animation ID
+if a registered mapping exists. This preserves vanilla hardcoded cases while
+creating an experimental escape hatch for unhandled tuples.
+
+When `CSWCAnimBase::GetAnimationName` cannot resolve an ID through
+`animations.2da`, the hook checks the registry by ID. On a hit, it writes the
+registered animation name into the function's output `CExoString` and resumes
+the vanilla success path. On a miss, it resumes the vanilla failure path.
 
 Until the loader hook can inject rows into `animations.2da`, downstream patches
 should use `RegisterAnimationWithId` with an ID that is already valid in the
@@ -39,11 +48,9 @@ active `animations.2da` file. `RegisterAnimation` still exists for the future
 loader-backed path, but auto-assigned IDs are not safe for release content yet.
 
 `Patches/CustomAnimationSmokeTest` is the current development harness. It maps
-the global wildcard to K1 row `17` (`victory`) so hook hits are visible in debug
-output and, when the fallback path is reached, in-game behavior.
-
-The reverse ID-to-name lookup is phase-3 scaffolding. It is intended for a
-future `CSWCAnimBase::GetAnimationName` bypass so release patches can resolve
-custom IDs without mutating the engine-owned `C2DA` table directly.
+the global wildcard to custom ID `65000`, then resolves that ID back to
+`victory` through the `GetAnimationName` bypass. This keeps the smoke test out
+of the vanilla `animations.2da` row range while still using a model animation
+that stock character models usually have.
 
 The prototype currently supports the K1 1.03 GOG and CD crack hashes already used by `ScriptExtender`.

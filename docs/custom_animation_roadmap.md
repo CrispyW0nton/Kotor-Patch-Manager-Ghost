@@ -21,17 +21,18 @@ Implemented:
 - `Patches/CustomAnimationCore`
 - `Patches/CustomAnimationSmokeTest`
 - Exported registry API for animation name/ID mappings
-- Reverse ID-to-name lookup scaffold for future animation-name bypass hooks
+- Reverse ID-to-name lookup for custom animation IDs
 - Wildcard resolver lookup for smoke-test coverage
 - K1 hooks on `CSWCCreature::UpdateMeleeAttackData` fallback epilogue at `0x0061406c`
 - K1 hooks on `CSWCCreature::UpdateRangedAttackData` fallback epilogue at `0x0061428c`
+- K1 hook on `CSWCAnimBase::GetAnimationName` post-2DA lookup branch at `0x0069e690`
 - Build/package verification via `Patches/create-patch.bat`
 
 Prototype limitation:
 
 - It only overrides fallback/default combat animation IDs.
-- It does not yet inject rows into `animations.2da`.
-- Downstream tests must currently map to an animation ID already valid in the loaded `animations.2da`.
+- It bypasses failed `animations.2da` ID-to-name lookups, but does not mutate the `C2DA` table.
+- Downstream tests can currently map to explicitly registered IDs below `0xffff`.
 
 ## Roadmap
 
@@ -39,13 +40,13 @@ Prototype limitation:
 
 Goal: demonstrate that `CustomAnimationCore` can override an animation ID in live K1 combat without breaking vanilla cases.
 
-Status: in progress. `CustomAnimationSmokeTest` now loads as a DLL-only dependent patch, registers `cac_smoke_victory` as K1 animation row `17`, and maps the global wildcard key `(0xff, 0xff)` to that animation.
+Status: in progress. `CustomAnimationSmokeTest` now loads as a DLL-only dependent patch, registers `victory` as custom animation ID `65000`, and maps the global wildcard key `(0xff, 0xff)` to that animation.
 
 Tasks:
 
 - Add a tiny test patch, `Patches/CustomAnimationSmokeTest`. Done.
 - In `DllMain`, resolve `custom-animation-core.dll` exports with `GetProcAddress`. Done.
-- Call `RegisterAnimationWithId("known_existing_anim", existingRowId)`. Done with `cac_smoke_victory -> 17`.
+- Call `RegisterAnimationWithId("known_existing_anim", existingRowId)`. Done with `victory -> 65000`.
 - Call `MapWeaponAction(testWeaponKey, testActionKey, "known_existing_anim")`. Done with wildcard `(0xff, 0xff)`.
 - Use a mapping that is easy to trigger in-game and falls through the hooked default path.
 - Add debug logging for all hook hits, misses, and successful substitutions. Done in `CustomAnimationCore`.
@@ -81,12 +82,12 @@ Acceptance:
 
 Goal: remove the requirement that a custom animation already exists as a vanilla/override row.
 
-Status: research started. Direct `C2DA` mutation is not the first implementation target because the current GameAPI wrapper only exposes read calls and the internal row-storage layout is not fully labelled. The safer next target is a lookup-level bypass around animation ID -> animation name resolution. The registry now exposes `LookupAnimationNameById` for that path.
+Status: lookup-level bypass scaffold implemented. Direct `C2DA` mutation is not the first implementation target because the current GameAPI wrapper only exposes read calls and the internal row-storage layout is not fully labelled. `CSWCAnimBase::GetAnimationName` now has a K1 hook that lets registered custom IDs resolve to animation names after vanilla `animations.2da` lookup fails.
 
 Tasks:
 
 - Inspect `CTwoDimArrays::Load2DArrays_Animations` and `C2DA` memory layout in Ghidra. Started.
-- Decide between true `C2DA` mutation and lookup-level bypass. Initial choice: lookup-level bypass first.
+- Decide between true `C2DA` mutation and lookup-level bypass. Initial choice implemented: lookup-level bypass first.
 - If mutating `C2DA`, add GameAPI support for row append or row-label lookup.
 - Load a small patch-owned config, likely `additional/custom_animations.toml`, with explicit IDs and names.
 - Ensure IDs are deterministic across launches and save/load.

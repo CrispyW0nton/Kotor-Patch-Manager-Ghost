@@ -44,3 +44,18 @@ type = "pointer" # UpdateRangedAttackData param_1.
 [[hooks.parameters]]
 source = "esp+12"
 type = "pointer" # UpdateRangedAttackData param_2.
+
+# CSWCAnimBase::GetAnimationName post-animations.2da lookup branch.
+#
+# This detour is intentionally non-returning. The stolen bytes include a short
+# conditional jump, so replaying them from the generated wrapper would retarget
+# the branch into wrapper memory. OverrideAnimationNameLookup restores the
+# wrapper-saved CPU state itself, then jumps to either:
+# - 0x0069e6a2: vanilla success path, after output CExoString is populated
+# - 0x0069e699: vanilla failure assignment path, after recreating the stolen PUSH
+[[hooks]]
+address = 0x0069e690
+type = "detour"
+function = "OverrideAnimationNameLookup"
+original_bytes = [0x85, 0xc0, 0x75, 0x0e, 0x68, 0x1c, 0xd7, 0x73, 0x00]
+skip_original_bytes = true

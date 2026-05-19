@@ -1,12 +1,44 @@
 #include "Common.h"
+#include "GameAPI/CExoString.h"
 #include "GameAPI/GameVersion.h"
 #include "Registry.h"
 
 namespace {
 constexpr uint16_t InvalidAnimationId = 0xffff;
 
+using CExoStringAssignFn = void*(__thiscall*)(void* thisPtr, void* other);
+CExoStringAssignFn cExoStringAssign = nullptr;
+
 uint8_t LowByteOrZero(const uint32_t* value) {
     return value ? static_cast<uint8_t>(*value & 0xff) : 0;
+}
+
+bool EnsureCExoStringAssign() {
+    if (cExoStringAssign) {
+        return true;
+    }
+
+    try {
+        cExoStringAssign = reinterpret_cast<CExoStringAssignFn>(
+            GameVersion::GetFunctionAddress("CExoString", "operator=")
+        );
+    }
+    catch (const GameVersionException& e) {
+        debugLog("[CustomAnimationCore] ERROR: %s\n", e.what());
+        return false;
+    }
+
+    return cExoStringAssign != nullptr;
+}
+
+bool AssignCExoString(void* outputString, const char* value) {
+    if (!outputString || !value || !EnsureCExoStringAssign()) {
+        return false;
+    }
+
+    CExoString source(const_cast<char*>(value));
+    cExoStringAssign(outputString, source.GetPtr());
+    return true;
 }
 
 uint32_t ResolveAnimationOverride(
@@ -72,6 +104,27 @@ extern "C" uint32_t __cdecl ResolveRangedAnimationOverride(
     return ResolveAnimationOverride("ranged", vanillaId, key1, key2);
 }
 
+extern "C" uint32_t __cdecl ResolveCustomAnimationNameFromId(
+    uint32_t animationId,
+    void* outputString
+) {
+    const char* animName = CustomAnimationRegistry::Instance().LookupAnimationNameById(
+        static_cast<uint16_t>(animationId & 0xffff)
+    );
+    if (!animName) {
+        debugLog("[CustomAnimationCore] GetAnimationName miss for id %u\n", animationId);
+        return 0;
+    }
+
+    if (!AssignCExoString(outputString, animName)) {
+        debugLog("[CustomAnimationCore] GetAnimationName failed to assign %s for id %u\n", animName, animationId);
+        return 0;
+    }
+
+    debugLog("[CustomAnimationCore] GetAnimationName override id %u -> %s\n", animationId, animName);
+    return 1;
+}
+
 extern "C" __declspec(naked) void __cdecl OverrideMeleeDefaultAnimationId() {
     __asm {
         push dword ptr [esp + 12]
@@ -93,6 +146,39 @@ extern "C" __declspec(naked) void __cdecl OverrideRangedDefaultAnimationId() {
         add esp, 12
         mov esi, eax
         ret
+    }
+}
+
+extern "C" __declspec(naked) void __cdecl OverrideAnimationNameLookup() {
+    __asm {
+        test eax, eax
+        jnz CustomAnimationNameSuccess
+
+        mov ecx, dword ptr [ebx + 16]
+        lea ecx, [ecx + 0x18]
+        push ecx
+        push edi
+        call ResolveCustomAnimationNameFromId
+        add esp, 8
+        test eax, eax
+        jnz CustomAnimationNameSuccess
+
+    CustomAnimationNameFailure:
+        mov edx, ebx
+        mov esp, edx
+        popfd
+        popad
+        push 0x0073d71c
+        mov eax, 0x0069e699
+        jmp eax
+
+    CustomAnimationNameSuccess:
+        mov edx, ebx
+        mov esp, edx
+        popfd
+        popad
+        mov eax, 0x0069e6a2
+        jmp eax
     }
 }
 

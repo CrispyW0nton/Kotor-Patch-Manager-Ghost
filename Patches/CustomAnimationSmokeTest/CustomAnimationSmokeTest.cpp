@@ -5,8 +5,8 @@
 
 namespace {
 constexpr uint8_t WildcardKey = 0xff;
-constexpr uint16_t SmokeAnimationRow = 17; // animations.2da: victory
-constexpr const char* SmokeAnimationName = "cac_smoke_victory";
+constexpr uint16_t SmokeAnimationId = 65000;
+constexpr const char* SmokeAnimationName = "victory";
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
 using MapWeaponActionFn = bool(__cdecl*)(uint8_t, uint8_t, const char*);
@@ -35,31 +35,31 @@ bool InstallSmokeMapping() {
         return false;
     }
 
-    if (!registerAnimationWithId(SmokeAnimationName, SmokeAnimationRow)) {
+    if (!registerAnimationWithId(SmokeAnimationName, SmokeAnimationId)) {
         debugLog(
-            "[CustomAnimationSmokeTest] ERROR: failed to register %s as row %u\n",
+            "[CustomAnimationSmokeTest] ERROR: failed to register %s as id %u\n",
             SmokeAnimationName,
-            SmokeAnimationRow
+            SmokeAnimationId
         );
         return false;
     }
 
     const uint16_t resolvedRow = lookupAnimationId(SmokeAnimationName);
-    if (resolvedRow != SmokeAnimationRow) {
+    if (resolvedRow != SmokeAnimationId) {
         debugLog(
             "[CustomAnimationSmokeTest] ERROR: %s resolved to %u, expected %u\n",
             SmokeAnimationName,
             resolvedRow,
-            SmokeAnimationRow
+            SmokeAnimationId
         );
         return false;
     }
 
-    const char* resolvedName = lookupAnimationNameById(SmokeAnimationRow);
+    const char* resolvedName = lookupAnimationNameById(SmokeAnimationId);
     if (!resolvedName || strcmp(resolvedName, SmokeAnimationName) != 0) {
         debugLog(
-            "[CustomAnimationSmokeTest] ERROR: row %u resolved to %s, expected %s\n",
-            SmokeAnimationRow,
+            "[CustomAnimationSmokeTest] ERROR: id %u resolved to %s, expected %s\n",
+            SmokeAnimationId,
             resolvedName ? resolvedName : "<null>",
             SmokeAnimationName
         );
@@ -72,9 +72,9 @@ bool InstallSmokeMapping() {
     }
 
     debugLog(
-        "[CustomAnimationSmokeTest] Installed wildcard mapping (*,*) -> %s / row %u\n",
+        "[CustomAnimationSmokeTest] Installed wildcard mapping (*,*) -> %s / id %u\n",
         SmokeAnimationName,
-        SmokeAnimationRow
+        SmokeAnimationId
     );
     return true;
 }

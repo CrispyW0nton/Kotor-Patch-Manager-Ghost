@@ -9,3 +9,4 @@ EXPORTS
     ClearCustomAnimationRegistry
     OverrideMeleeDefaultAnimationId
     OverrideRangedDefaultAnimationId
+    OverrideAnimationNameLookup
