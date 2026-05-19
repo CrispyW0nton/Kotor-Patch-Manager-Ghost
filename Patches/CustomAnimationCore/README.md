@@ -9,6 +9,7 @@ The first pass exposes a small exported registry that downstream patches can use
 - `MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName) -> bool`
 - `LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) -> const char*`
 - `LookupAnimationId(const char* name) -> uint16_t`
+- `LookupAnimationNameById(uint16_t id) -> const char*`
 - `ClearCustomAnimationRegistry() -> void`
 
 Registry rules for the v0 prototype:
@@ -40,5 +41,9 @@ loader-backed path, but auto-assigned IDs are not safe for release content yet.
 `Patches/CustomAnimationSmokeTest` is the current development harness. It maps
 the global wildcard to K1 row `17` (`victory`) so hook hits are visible in debug
 output and, when the fallback path is reached, in-game behavior.
+
+The reverse ID-to-name lookup is phase-3 scaffolding. It is intended for a
+future `CSWCAnimBase::GetAnimationName` bypass so release patches can resolve
+custom IDs without mutating the engine-owned `C2DA` table directly.
 
 The prototype currently supports the K1 1.03 GOG and CD crack hashes already used by `ScriptExtender`.

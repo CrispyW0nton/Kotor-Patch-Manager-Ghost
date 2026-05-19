@@ -5,6 +5,7 @@ EXPORTS
     MapWeaponAction
     LookupRegisteredAnim
     LookupAnimationId
+    LookupAnimationNameById
     ClearCustomAnimationRegistry
     OverrideMeleeDefaultAnimationId
     OverrideRangedDefaultAnimationId

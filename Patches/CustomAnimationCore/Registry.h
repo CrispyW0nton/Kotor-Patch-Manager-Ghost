@@ -26,6 +26,7 @@ public:
     bool MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName);
     const char* LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind);
     uint16_t LookupAnimationId(const char* name);
+    const char* LookupAnimationNameById(uint16_t id);
     void Clear();
 
 private:

@@ -21,6 +21,7 @@ Implemented:
 - `Patches/CustomAnimationCore`
 - `Patches/CustomAnimationSmokeTest`
 - Exported registry API for animation name/ID mappings
+- Reverse ID-to-name lookup scaffold for future animation-name bypass hooks
 - Wildcard resolver lookup for smoke-test coverage
 - K1 hooks on `CSWCCreature::UpdateMeleeAttackData` fallback epilogue at `0x0061406c`
 - K1 hooks on `CSWCCreature::UpdateRangedAttackData` fallback epilogue at `0x0061428c`
@@ -80,10 +81,12 @@ Acceptance:
 
 Goal: remove the requirement that a custom animation already exists as a vanilla/override row.
 
+Status: research started. Direct `C2DA` mutation is not the first implementation target because the current GameAPI wrapper only exposes read calls and the internal row-storage layout is not fully labelled. The safer next target is a lookup-level bypass around animation ID -> animation name resolution. The registry now exposes `LookupAnimationNameById` for that path.
+
 Tasks:
 
-- Inspect `CTwoDimArrays::Load2DArrays_Animations` and `C2DA` memory layout in Ghidra.
-- Decide between true `C2DA` mutation and lookup-level bypass.
+- Inspect `CTwoDimArrays::Load2DArrays_Animations` and `C2DA` memory layout in Ghidra. Started.
+- Decide between true `C2DA` mutation and lookup-level bypass. Initial choice: lookup-level bypass first.
 - If mutating `C2DA`, add GameAPI support for row append or row-label lookup.
 - Load a small patch-owned config, likely `additional/custom_animations.toml`, with explicit IDs and names.
 - Ensure IDs are deterministic across launches and save/load.

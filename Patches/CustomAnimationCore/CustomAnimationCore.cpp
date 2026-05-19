@@ -128,6 +128,10 @@ extern "C" uint16_t __cdecl LookupAnimationId(const char* name) {
     return CustomAnimationRegistry::Instance().LookupAnimationId(name);
 }
 
+extern "C" const char* __cdecl LookupAnimationNameById(uint16_t id) {
+    return CustomAnimationRegistry::Instance().LookupAnimationNameById(id);
+}
+
 extern "C" void __cdecl ClearCustomAnimationRegistry() {
     CustomAnimationRegistry::Instance().Clear();
 }

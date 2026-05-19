@@ -122,6 +122,20 @@ uint16_t CustomAnimationRegistry::LookupAnimationId(const char* name) {
     return existing->second;
 }
 
+const char* CustomAnimationRegistry::LookupAnimationNameById(uint16_t id) {
+    if (id == InvalidAnimationId) {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(registryMutex);
+
+    auto existing = idToName.find(id);
+    if (existing == idToName.end()) {
+        return nullptr;
+    }
+    return existing->second.c_str();
+}
+
 void CustomAnimationRegistry::Clear() {
     std::lock_guard<std::mutex> lock(registryMutex);
     nameToId.clear();
