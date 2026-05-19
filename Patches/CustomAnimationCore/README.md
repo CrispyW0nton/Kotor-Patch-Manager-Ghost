@@ -7,7 +7,9 @@ The first pass exposes a small exported registry that downstream patches can use
 - `RegisterAnimation(const char* name) -> uint16_t`
 - `RegisterAnimationWithId(const char* name, uint16_t id) -> bool`
 - `MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName) -> bool`
+- `MapResolverAnimation(uint8_t resolverFamily, uint8_t key1, uint8_t key2, const char* animName) -> bool`
 - `LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) -> const char*`
+- `LookupRegisteredResolverAnim(uint8_t resolverFamily, uint8_t key1, uint8_t key2) -> const char*`
 - `LookupAnimationId(const char* name) -> uint16_t`
 - `LookupAnimationNameById(uint16_t id) -> const char*`
 - `ClearCustomAnimationRegistry() -> void`
@@ -19,12 +21,15 @@ Registry rules for the v0 prototype:
 - Registering the same name with the same ID is idempotent.
 - Registering the same name with a different ID fails.
 - Registering a different name with an already-used ID fails.
-- `MapWeaponAction` only accepts names that are already registered.
+- `MapResolverAnimation` only accepts names that are already registered.
+- `MapWeaponAction` is retained as a compatibility wrapper for family `0`
+  mappings.
 
-Resolver keys currently support `0xff` as a wildcard. Lookup order is exact
-match, weapon wildcard, action wildcard, then global wildcard. This exists so
-the smoke-test patch can prove the hook path before the parameter semantics are
-fully named.
+Resolver families are `0 = any`, `1 = melee`, and `2 = ranged`. Resolver keys
+currently support `0xff` as a wildcard. Lookup order is family exact match,
+family key wildcards, then the same sequence against the `any` family. This
+exists so the smoke-test patch can prove the hook path before the parameter
+semantics are fully named.
 
 The first K1 prototype hooks the fallback/default return paths in:
 
@@ -33,9 +38,9 @@ The first K1 prototype hooks the fallback/default return paths in:
 - `CSWCAnimBase::GetAnimationName`
 
 When vanilla falls through to the combat default paths, the hook resolves the
-raw resolver tuple through `MapWeaponAction` and swaps the returned animation ID
-if a registered mapping exists. This preserves vanilla hardcoded cases while
-creating an experimental escape hatch for unhandled tuples.
+raw resolver tuple through the family-aware resolver map and swaps the returned
+animation ID if a registered mapping exists. This preserves vanilla hardcoded
+cases while creating an experimental escape hatch for unhandled tuples.
 
 When `CSWCAnimBase::GetAnimationName` cannot resolve an ID through
 `animations.2da`, the hook checks the registry by ID. On a hit, it writes the

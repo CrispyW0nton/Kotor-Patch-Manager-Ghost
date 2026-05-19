@@ -5,11 +5,12 @@
 
 namespace {
 constexpr uint8_t WildcardKey = 0xff;
+constexpr uint8_t ResolverFamilyAny = 0;
 constexpr uint16_t SmokeAnimationId = 65000;
 constexpr const char* SmokeAnimationName = "victory";
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
-using MapWeaponActionFn = bool(__cdecl*)(uint8_t, uint8_t, const char*);
+using MapResolverAnimationFn = bool(__cdecl*)(uint8_t, uint8_t, uint8_t, const char*);
 using LookupAnimationIdFn = uint16_t(__cdecl*)(const char*);
 using LookupAnimationNameByIdFn = const char*(__cdecl*)(uint16_t);
 
@@ -26,11 +27,11 @@ bool InstallSmokeMapping() {
     }
 
     auto registerAnimationWithId = ResolveExport<RegisterAnimationWithIdFn>(core, "RegisterAnimationWithId");
-    auto mapWeaponAction = ResolveExport<MapWeaponActionFn>(core, "MapWeaponAction");
+    auto mapResolverAnimation = ResolveExport<MapResolverAnimationFn>(core, "MapResolverAnimation");
     auto lookupAnimationId = ResolveExport<LookupAnimationIdFn>(core, "LookupAnimationId");
     auto lookupAnimationNameById = ResolveExport<LookupAnimationNameByIdFn>(core, "LookupAnimationNameById");
 
-    if (!registerAnimationWithId || !mapWeaponAction || !lookupAnimationId || !lookupAnimationNameById) {
+    if (!registerAnimationWithId || !mapResolverAnimation || !lookupAnimationId || !lookupAnimationNameById) {
         debugLog("[CustomAnimationSmokeTest] ERROR: required CustomAnimationCore export is missing\n");
         return false;
     }
@@ -66,13 +67,13 @@ bool InstallSmokeMapping() {
         return false;
     }
 
-    if (!mapWeaponAction(WildcardKey, WildcardKey, SmokeAnimationName)) {
+    if (!mapResolverAnimation(ResolverFamilyAny, WildcardKey, WildcardKey, SmokeAnimationName)) {
         debugLog("[CustomAnimationSmokeTest] ERROR: failed to install wildcard mapping\n");
         return false;
     }
 
     debugLog(
-        "[CustomAnimationSmokeTest] Installed wildcard mapping (*,*) -> %s / id %u\n",
+        "[CustomAnimationSmokeTest] Installed wildcard mapping family=any keys=(*,*) -> %s / id %u\n",
         SmokeAnimationName,
         SmokeAnimationId
     );

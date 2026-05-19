@@ -9,7 +9,7 @@ attach it:
 - resolves `custom-animation-core.dll` exports,
 - registers `victory` as custom animation ID `65000`,
 - verifies both name-to-ID and ID-to-name registry lookups,
-- maps the wildcard resolver key `(0xff, 0xff)` to that ID.
+- maps the family-agnostic wildcard resolver key `(0, 0xff, 0xff)` to that ID.
 
 With both patches installed, any hooked fallback/default combat resolver path
 should log a `CustomAnimationCore` override and return ID `65000`. The

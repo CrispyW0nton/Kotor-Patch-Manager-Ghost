@@ -7,12 +7,14 @@ constexpr uint16_t InvalidAnimationId = 0xffff;
 constexpr uint16_t FirstDynamicAnimationId = 65000;
 }
 
-bool WeaponActionKey::operator==(const WeaponActionKey& other) const {
-    return weaponType == other.weaponType && actionKind == other.actionKind;
+bool ResolverKey::operator==(const ResolverKey& other) const {
+    return family == other.family && key1 == other.key1 && key2 == other.key2;
 }
 
-size_t WeaponActionKeyHash::operator()(const WeaponActionKey& key) const {
-    return (static_cast<size_t>(key.weaponType) << 8) | key.actionKind;
+size_t ResolverKeyHash::operator()(const ResolverKey& key) const {
+    return (static_cast<size_t>(key.family) << 16)
+        | (static_cast<size_t>(key.key1) << 8)
+        | key.key2;
 }
 
 CustomAnimationRegistry& CustomAnimationRegistry::Instance() {
@@ -74,6 +76,20 @@ bool CustomAnimationRegistry::RegisterAnimationWithId(const char* name, uint16_t
 }
 
 bool CustomAnimationRegistry::MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName) {
+    return MapResolverAnimation(
+        static_cast<uint8_t>(AnimationResolverFamily::Any),
+        weaponType,
+        actionKind,
+        animName
+    );
+}
+
+bool CustomAnimationRegistry::MapResolverAnimation(
+    uint8_t resolverFamily,
+    uint8_t key1,
+    uint8_t key2,
+    const char* animName
+) {
     if (!animName || !*animName) {
         return false;
     }
@@ -84,23 +100,39 @@ bool CustomAnimationRegistry::MapWeaponAction(uint8_t weaponType, uint8_t action
     }
 
     std::lock_guard<std::mutex> lock(registryMutex);
-    weaponActionToName[{ weaponType, actionKind }] = animName;
+    resolverToName[{ resolverFamily, key1, key2 }] = animName;
     return true;
 }
 
 const char* CustomAnimationRegistry::LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) {
+    return LookupRegisteredResolverAnim(
+        static_cast<uint8_t>(AnimationResolverFamily::Any),
+        weaponType,
+        actionKind
+    );
+}
+
+const char* CustomAnimationRegistry::LookupRegisteredResolverAnim(
+    uint8_t resolverFamily,
+    uint8_t key1,
+    uint8_t key2
+) {
     std::lock_guard<std::mutex> lock(registryMutex);
 
-    const WeaponActionKey candidates[] = {
-        { weaponType, actionKind },
-        { weaponType, WildcardKey },
-        { WildcardKey, actionKind },
-        { WildcardKey, WildcardKey },
+    const ResolverKey candidates[] = {
+        { resolverFamily, key1, key2 },
+        { resolverFamily, key1, WildcardKey },
+        { resolverFamily, WildcardKey, key2 },
+        { resolverFamily, WildcardKey, WildcardKey },
+        { static_cast<uint8_t>(AnimationResolverFamily::Any), key1, key2 },
+        { static_cast<uint8_t>(AnimationResolverFamily::Any), key1, WildcardKey },
+        { static_cast<uint8_t>(AnimationResolverFamily::Any), WildcardKey, key2 },
+        { static_cast<uint8_t>(AnimationResolverFamily::Any), WildcardKey, WildcardKey },
     };
 
-    for (const WeaponActionKey& candidate : candidates) {
-        auto existing = weaponActionToName.find(candidate);
-        if (existing != weaponActionToName.end()) {
+    for (const ResolverKey& candidate : candidates) {
+        auto existing = resolverToName.find(candidate);
+        if (existing != resolverToName.end()) {
             return existing->second.c_str();
         }
     }
@@ -140,6 +172,6 @@ void CustomAnimationRegistry::Clear() {
     std::lock_guard<std::mutex> lock(registryMutex);
     nameToId.clear();
     idToName.clear();
-    weaponActionToName.clear();
+    resolverToName.clear();
     nextId = FirstDynamicAnimationId;
 }

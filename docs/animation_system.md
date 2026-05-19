@@ -83,10 +83,18 @@ The registry exports:
 
 - `RegisterAnimation(const char* name) -> uint16_t`
 - `RegisterAnimationWithId(const char* name, uint16_t id) -> bool`
+- `MapResolverAnimation(uint8_t resolverFamily, uint8_t key1, uint8_t key2, const char* animName) -> bool`
 - `MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName) -> bool`
+- `LookupRegisteredResolverAnim(uint8_t resolverFamily, uint8_t key1, uint8_t key2) -> const char*`
 - `LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) -> const char*`
 - `LookupAnimationId(const char* name) -> uint16_t`
+- `LookupAnimationNameById(uint16_t id) -> const char*`
 - `ClearCustomAnimationRegistry() -> void`
+
+`MapWeaponAction` and `LookupRegisteredAnim` are compatibility wrappers around
+the family-agnostic resolver map. New code should prefer
+`MapResolverAnimation`, where family `0` means any, `1` means melee, and `2`
+means ranged. Resolver keys also support `0xff` wildcards.
 
 Dynamic IDs currently begin at `65000`, leaving room under the `0xffff` invalid/sentinel value while staying above vanilla-style content.
 

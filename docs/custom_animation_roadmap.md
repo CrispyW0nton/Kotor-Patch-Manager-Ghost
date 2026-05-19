@@ -22,7 +22,7 @@ Implemented:
 - `Patches/CustomAnimationSmokeTest`
 - Exported registry API for animation name/ID mappings
 - Reverse ID-to-name lookup for custom animation IDs
-- Wildcard resolver lookup for smoke-test coverage
+- Family-aware resolver lookup with wildcard support for smoke-test coverage
 - K1 hooks on `CSWCCreature::UpdateMeleeAttackData` fallback epilogue at `0x0061406c`
 - K1 hooks on `CSWCCreature::UpdateRangedAttackData` fallback epilogue at `0x0061428c`
 - K1 hook on `CSWCAnimBase::GetAnimationName` post-2DA lookup branch at `0x0069e690`
@@ -40,14 +40,14 @@ Prototype limitation:
 
 Goal: demonstrate that `CustomAnimationCore` can override an animation ID in live K1 combat without breaking vanilla cases.
 
-Status: in progress. `CustomAnimationSmokeTest` now loads as a DLL-only dependent patch, registers `victory` as custom animation ID `65000`, and maps the global wildcard key `(0xff, 0xff)` to that animation.
+Status: in progress. `CustomAnimationSmokeTest` now loads as a DLL-only dependent patch, registers `victory` as custom animation ID `65000`, and maps the family-agnostic global wildcard key `(0, 0xff, 0xff)` to that animation.
 
 Tasks:
 
 - Add a tiny test patch, `Patches/CustomAnimationSmokeTest`. Done.
 - In `DllMain`, resolve `custom-animation-core.dll` exports with `GetProcAddress`. Done.
 - Call `RegisterAnimationWithId("known_existing_anim", existingRowId)`. Done with `victory -> 65000`.
-- Call `MapWeaponAction(testWeaponKey, testActionKey, "known_existing_anim")`. Done with wildcard `(0xff, 0xff)`.
+- Call `MapWeaponAction(testWeaponKey, testActionKey, "known_existing_anim")`. Superseded by `MapResolverAnimation`; done with wildcard `(0, 0xff, 0xff)`.
 - Use a mapping that is easy to trigger in-game and falls through the hooked default path.
 - Add debug logging for all hook hits, misses, and successful substitutions. Done in `CustomAnimationCore`.
 
@@ -62,12 +62,12 @@ Acceptance:
 
 Goal: make the API safe for real downstream patches.
 
-Status: in progress. The registry now treats `(name, id)` registrations as stable pairs: duplicate same-name/same-ID registration is allowed, same-name/different-ID registration fails, different-name/same-ID registration fails, and resolver mappings require the animation name to be registered first.
+Status: in progress. The registry now treats `(name, id)` registrations as stable pairs: duplicate same-name/same-ID registration is allowed, same-name/different-ID registration fails, different-name/same-ID registration fails, and resolver mappings require the animation name to be registered first. Resolver mappings are now split by family (`any`, `melee`, `ranged`) so melee and ranged keys can no longer collide.
 
 Tasks:
 
-- Replace the ambiguous `(uint8 weaponType, uint8 actionKind)` key names with documented resolver-key names once K1 parameter semantics are confirmed.
-- Add separate map families if melee and ranged keys differ.
+- Replace the ambiguous `(uint8 weaponType, uint8 actionKind)` key names with documented resolver-key names once K1 parameter semantics are confirmed. In progress: `MapResolverAnimation` uses neutral `family/key1/key2` naming.
+- Add separate map families if melee and ranged keys differ. Done.
 - Add deterministic explicit-ID registration as the recommended v0 path. Done.
 - Reserve dynamic auto-ID allocation for after loader/table mutation exists. Done in docs and mapping behavior; `RegisterAnimation` remains exported for future loader-backed work.
 - Add duplicate-registration behavior to the README. Done.

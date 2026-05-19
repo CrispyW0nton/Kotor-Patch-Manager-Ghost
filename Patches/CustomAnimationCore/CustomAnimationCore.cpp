@@ -43,20 +43,26 @@ bool AssignCExoString(void* outputString, const char* value) {
 
 uint32_t ResolveAnimationOverride(
     const char* source,
+    uint8_t resolverFamily,
     uint32_t vanillaId,
     const uint32_t* key1,
     const uint32_t* key2
 ) {
-    const uint8_t weaponType = LowByteOrZero(key1);
-    const uint8_t actionKind = LowByteOrZero(key2);
+    const uint8_t resolverKey1 = LowByteOrZero(key1);
+    const uint8_t resolverKey2 = LowByteOrZero(key2);
 
-    const char* animName = CustomAnimationRegistry::Instance().LookupRegisteredAnim(weaponType, actionKind);
+    const char* animName = CustomAnimationRegistry::Instance().LookupRegisteredResolverAnim(
+        resolverFamily,
+        resolverKey1,
+        resolverKey2
+    );
     if (!animName) {
         debugLog(
-            "[CustomAnimationCore] %s miss (%u,%u); keeping %u\n",
+            "[CustomAnimationCore] %s miss family=%u keys=(%u,%u); keeping %u\n",
             source,
-            weaponType,
-            actionKind,
+            resolverFamily,
+            resolverKey1,
+            resolverKey2,
             vanillaId
         );
         return vanillaId;
@@ -65,10 +71,11 @@ uint32_t ResolveAnimationOverride(
     const uint16_t mappedId = CustomAnimationRegistry::Instance().LookupAnimationId(animName);
     if (mappedId == InvalidAnimationId) {
         debugLog(
-            "[CustomAnimationCore] %s mapping (%u,%u)->%s has no registered id; keeping %u\n",
+            "[CustomAnimationCore] %s mapping family=%u keys=(%u,%u)->%s has no registered id; keeping %u\n",
             source,
-            weaponType,
-            actionKind,
+            resolverFamily,
+            resolverKey1,
+            resolverKey2,
             animName,
             vanillaId
         );
@@ -76,10 +83,11 @@ uint32_t ResolveAnimationOverride(
     }
 
     debugLog(
-        "[CustomAnimationCore] %s override (%u,%u): %u -> %u (%s)\n",
+        "[CustomAnimationCore] %s override family=%u keys=(%u,%u): %u -> %u (%s)\n",
         source,
-        weaponType,
-        actionKind,
+        resolverFamily,
+        resolverKey1,
+        resolverKey2,
         vanillaId,
         mappedId,
         animName
@@ -93,7 +101,13 @@ extern "C" uint32_t __cdecl ResolveMeleeAnimationOverride(
     const uint32_t* key1,
     const uint32_t* key2
 ) {
-    return ResolveAnimationOverride("melee", vanillaId, key1, key2);
+    return ResolveAnimationOverride(
+        "melee",
+        static_cast<uint8_t>(AnimationResolverFamily::Melee),
+        vanillaId,
+        key1,
+        key2
+    );
 }
 
 extern "C" uint32_t __cdecl ResolveRangedAnimationOverride(
@@ -101,7 +115,13 @@ extern "C" uint32_t __cdecl ResolveRangedAnimationOverride(
     const uint32_t* key1,
     const uint32_t* key2
 ) {
-    return ResolveAnimationOverride("ranged", vanillaId, key1, key2);
+    return ResolveAnimationOverride(
+        "ranged",
+        static_cast<uint8_t>(AnimationResolverFamily::Ranged),
+        vanillaId,
+        key1,
+        key2
+    );
 }
 
 extern "C" uint32_t __cdecl ResolveCustomAnimationNameFromId(
@@ -206,8 +226,35 @@ extern "C" bool __cdecl MapWeaponAction(uint8_t weaponType, uint8_t actionKind, 
     return success;
 }
 
+extern "C" bool __cdecl MapResolverAnimation(
+    uint8_t resolverFamily,
+    uint8_t key1,
+    uint8_t key2,
+    const char* animName
+) {
+    const bool success = CustomAnimationRegistry::Instance().MapResolverAnimation(
+        resolverFamily,
+        key1,
+        key2,
+        animName
+    );
+    debugLog(
+        "[CustomAnimationCore] MapResolverAnimation(family=%u, key1=%u, key2=%u, anim=%s) -> %i\n",
+        resolverFamily,
+        key1,
+        key2,
+        animName ? animName : "<null>",
+        success
+    );
+    return success;
+}
+
 extern "C" const char* __cdecl LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) {
     return CustomAnimationRegistry::Instance().LookupRegisteredAnim(weaponType, actionKind);
+}
+
+extern "C" const char* __cdecl LookupRegisteredResolverAnim(uint8_t resolverFamily, uint8_t key1, uint8_t key2) {
+    return CustomAnimationRegistry::Instance().LookupRegisteredResolverAnim(resolverFamily, key1, key2);
 }
 
 extern "C" uint16_t __cdecl LookupAnimationId(const char* name) {

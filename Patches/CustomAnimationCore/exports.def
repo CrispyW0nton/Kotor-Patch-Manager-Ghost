@@ -3,7 +3,9 @@ EXPORTS
     RegisterAnimation
     RegisterAnimationWithId
     MapWeaponAction
+    MapResolverAnimation
     LookupRegisteredAnim
+    LookupRegisteredResolverAnim
     LookupAnimationId
     LookupAnimationNameById
     ClearCustomAnimationRegistry
