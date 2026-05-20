@@ -10,7 +10,16 @@ using CExoStringAssignFn = void*(__thiscall*)(void* thisPtr, void* other);
 CExoStringAssignFn cExoStringAssign = nullptr;
 
 uint8_t LowByteOrZero(const uint32_t* value) {
-    return value ? static_cast<uint8_t>(*value & 0xff) : 0;
+    if (!value) {
+        return 0;
+    }
+
+    __try {
+        return static_cast<uint8_t>(*value & 0xff);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
 }
 
 bool EnsureCExoStringAssign() {
