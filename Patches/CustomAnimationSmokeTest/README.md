@@ -7,12 +7,14 @@ patch after `custom-animation-core` because of the manifest dependency. On
 attach it:
 
 - resolves `custom-animation-core.dll` exports,
-- registers `victory` as custom animation ID `65000`,
+- registers `custom_mixamo_a1` as custom animation ID `65000`,
 - verifies both name-to-ID and ID-to-name registry lookups,
 - maps the family-agnostic wildcard resolver key `(0, 0xff, 0xff)` to that ID.
 
 With both patches installed, any hooked fallback/default combat resolver path
 should log a `CustomAnimationCore` override and return ID `65000`. The
-`GetAnimationName` bypass then resolves that custom ID back to the normal model
-animation name `victory`. This is only for proving the hook contract; release
-demos should use explicit resolver keys and real custom animation IDs.
+`GetAnimationName` bypass then resolves that custom ID back to the generated
+model animation name `custom_mixamo_a1`. For local testing, install a supermodel
+MDL/MDX pair containing that animation in Override. This is only for proving the
+hook contract; release demos should use explicit resolver keys and package their
+asset files through KPM's `additional/` flow once that installer path exists.

@@ -25,6 +25,7 @@ mono_crash.*
 
 # patch Results
 *.kpatch
+tmp_custom_anim_probe/
 
 # Build results
 [Dd]ebug/
