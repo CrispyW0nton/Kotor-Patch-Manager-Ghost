@@ -2,8 +2,10 @@
 #
 # These first hooks target the shared fallback epilogues in the client-side
 # attack animation ID resolvers. They let vanilla compute an animation ID, then
-# allow CustomAnimationCore to swap ESI before the original MOV EAX, ESI return
-# sequence executes.
+# allow CustomAnimationCore to swap ESI and emulate the original function
+# epilogue. They are intentionally non-returning because the stolen bytes
+# include RET instructions that must execute against Update*AttackData's stack
+# frame, not inside KPM's generated wrapper.
 
 # CSWCCreature::UpdateMeleeAttackData fallback/default epilogue.
 [[hooks]]
@@ -12,6 +14,7 @@ type = "detour"
 function = "OverrideMeleeDefaultAnimationId"
 original_bytes = [0x5f, 0x8b, 0xc6, 0x5e, 0x5b, 0xc2, 0x10, 0x00]
 exclude_from_restore = ["esi"]
+skip_original_bytes = true
 
 [[hooks.parameters]]
 source = "esi"
@@ -32,6 +35,7 @@ type = "detour"
 function = "OverrideRangedDefaultAnimationId"
 original_bytes = [0x8b, 0xc6, 0x5e, 0xc2, 0x08, 0x00]
 exclude_from_restore = ["esi"]
+skip_original_bytes = true
 
 [[hooks.parameters]]
 source = "esi"

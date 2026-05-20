@@ -41,6 +41,9 @@ When vanilla falls through to the combat default paths, the hook resolves the
 raw resolver tuple through the family-aware resolver map and swaps the returned
 animation ID if a registered mapping exists. This preserves vanilla hardcoded
 cases while creating an experimental escape hatch for unhandled tuples.
+These combat epilogue hooks are non-returning: they restore KPM's wrapper-saved
+state and emulate the stolen game epilogue directly because the overwritten
+bytes include `RET` instructions.
 
 When `CSWCAnimBase::GetAnimationName` cannot resolve an ID through
 `animations.2da`, the hook checks the registry by ID. On a hit, it writes the

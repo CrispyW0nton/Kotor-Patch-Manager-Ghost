@@ -152,8 +152,22 @@ extern "C" __declspec(naked) void __cdecl OverrideMeleeDefaultAnimationId() {
         push dword ptr [esp + 4]
         call ResolveMeleeAnimationOverride
         add esp, 12
-        mov esi, eax
-        ret
+
+        // KPM's wrapper saved the original game ESI at [EBX+8]. Patch that
+        // saved value, restore the wrapper state, then run the original game
+        // epilogue ourselves. Returning to the wrapper would make it replay a
+        // RET from wrapper memory, not from UpdateMeleeAttackData's frame.
+        mov dword ptr [ebx + 8], eax
+        mov edx, ebx
+        mov esp, edx
+        popfd
+        popad
+
+        pop edi
+        mov eax, esi
+        pop esi
+        pop ebx
+        ret 0x10
     }
 }
 
@@ -164,8 +178,18 @@ extern "C" __declspec(naked) void __cdecl OverrideRangedDefaultAnimationId() {
         push dword ptr [esp + 4]
         call ResolveRangedAnimationOverride
         add esp, 12
-        mov esi, eax
-        ret
+
+        // See OverrideMeleeDefaultAnimationId for why this hook restores state
+        // and emulates the original epilogue instead of returning to the wrapper.
+        mov dword ptr [ebx + 8], eax
+        mov edx, ebx
+        mov esp, edx
+        popfd
+        popad
+
+        mov eax, esi
+        pop esi
+        ret 0x08
     }
 }
 
