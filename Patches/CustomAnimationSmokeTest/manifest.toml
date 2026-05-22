@@ -3,7 +3,7 @@ id = "custom-animation-smoke-test"
 name = "Custom Animation Smoke Test"
 version = "0.1.0"
 author = "CrispyW0nton"
-description = "Development-only smoke test for Custom Animation Core. Registers a wildcard combat-animation mapping to a custom Mixamo-derived K1 test clip."
+description = "Development-only smoke test for Custom Animation Core. Registers a wildcard combat-animation mapping to the local victory test clip."
 
 requires = ["custom-animation-core"]
 
