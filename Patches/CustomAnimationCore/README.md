@@ -55,20 +55,22 @@ the vanilla success path. On a miss, it resumes the vanilla failure path.
 
 `CSWCAnimBase::SetAnimation` is hooked at function entry so development patches
 can remap a vanilla animation ID to a registered custom ID before playback is
-forwarded to the concrete animation implementation. The smoke test uses this to
-map vanilla pause/idle IDs to `65000` for live testing. In the current asset
-pipeline this hook is useful for proving the call path, but a malformed MDL
-animation block can still crash earlier during model/animation footprint setup.
+forwarded to the concrete animation implementation. Live testing showed vanilla
+idle and locomotion IDs are not safe proof points because remapping them can
+leave run/walk state stuck, so the current smoke test leaves those IDs alone.
+The hook remains useful for narrowly scoped scripted or interaction-based test
+triggers. In the current asset pipeline, a malformed MDL animation block can
+still crash earlier during model/animation footprint setup.
 
 Until the loader hook can inject rows into `animations.2da`, downstream patches
 should use `RegisterAnimationWithId` with an ID that is already valid in the
 active `animations.2da` file. `RegisterAnimation` still exists for the future
 loader-backed path, but auto-assigned IDs are not safe for release content yet.
 
-`Patches/CustomAnimationSmokeTest` is the current development harness. It maps
-the global wildcard and vanilla pause/idle animation IDs to custom ID `65000`,
-then resolves that ID back to `victory` through the `GetAnimationName` bypass.
-This keeps the smoke test out of the vanilla `animations.2da` row range while
-still using a model animation that stock character models usually have.
+`Patches/CustomAnimationSmokeTest` is the current development harness. It
+registers custom ID `65000` for `victory`, installs the family-agnostic wildcard
+resolver mapping, and resolves that ID back to `victory` through the
+`GetAnimationName` bypass. This keeps the smoke test out of the vanilla
+`animations.2da` row range while avoiding broad idle/locomotion remaps.
 
 The prototype currently supports the K1 1.03 GOG and CD crack hashes already used by `ScriptExtender`.

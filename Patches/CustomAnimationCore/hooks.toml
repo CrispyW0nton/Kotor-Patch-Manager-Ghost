@@ -3,9 +3,9 @@
 # CSWCAnimBase::SetAnimation entry.
 #
 # Development patches can remap animation IDs before the engine forwards them
-# to the concrete animation implementation. The current smoke test maps vanilla
-# pause/idle IDs to the custom `victory` ID, so loading a save should
-# immediately exercise the custom model clip as idle.
+# to the concrete animation implementation. This is useful for targeted test
+# triggers, but the current smoke test leaves vanilla idle/locomotion IDs alone
+# after live testing showed those paths are not safe proof points.
 [[hooks]]
 address = 0x0069d4f0
 type = "detour"
@@ -21,7 +21,7 @@ type = "pointer" # CSWCAnimBase::SetAnimation animation-id stack slot.
 # Player and humanoid creature bodies commonly dispatch through the concrete
 # head/wield animation implementation instead of the CSWCAnimBase wrapper
 # above. Hooking this entry gives the smoke test telemetry on the live body
-# path and lets the same registry override rewrite the ID before either
+# path and lets a targeted registry override rewrite the ID before either
 # underlying SetAnimationInternal call consumes it.
 [[hooks]]
 address = 0x006993b0
