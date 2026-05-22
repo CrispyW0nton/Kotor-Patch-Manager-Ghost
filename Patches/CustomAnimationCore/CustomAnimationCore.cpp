@@ -154,6 +154,48 @@ extern "C" uint32_t __cdecl ResolveCustomAnimationNameFromId(
     return 1;
 }
 
+void ResolveSetAnimationIdOverride(uint32_t* animationIdSlot) {
+    if (!animationIdSlot) {
+        return;
+    }
+
+    uint16_t vanillaId = InvalidAnimationId;
+    __try {
+        vanillaId = static_cast<uint16_t>(*animationIdSlot & 0xffff);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return;
+    }
+
+    const uint16_t mappedId = CustomAnimationRegistry::Instance().LookupAnimationIdOverride(vanillaId);
+    if (mappedId == InvalidAnimationId || mappedId == vanillaId) {
+        return;
+    }
+
+    __try {
+        *animationIdSlot = mappedId;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return;
+    }
+
+    static LONG logCount = 0;
+    const LONG currentLog = InterlockedIncrement(&logCount);
+    if (currentLog <= 25) {
+        const char* mappedName = CustomAnimationRegistry::Instance().LookupAnimationNameById(mappedId);
+        debugLog(
+            "[CustomAnimationCore] SetAnimation id override %u -> %u (%s)\n",
+            vanillaId,
+            mappedId,
+            mappedName ? mappedName : "<unknown>"
+        );
+    }
+}
+
+extern "C" void __cdecl OverrideSetAnimationId(uint32_t* animationIdSlot) {
+    ResolveSetAnimationIdOverride(animationIdSlot);
+}
+
 extern "C" __declspec(naked) void __cdecl OverrideMeleeDefaultAnimationId() {
     __asm {
         push dword ptr [esp + 12]
@@ -279,6 +321,12 @@ extern "C" bool __cdecl MapResolverAnimation(
         animName ? animName : "<null>",
         success
     );
+    return success;
+}
+
+extern "C" bool __cdecl MapAnimationIdOverride(uint16_t fromId, uint16_t toId) {
+    const bool success = CustomAnimationRegistry::Instance().MapAnimationIdOverride(fromId, toId);
+    debugLog("[CustomAnimationCore] MapAnimationIdOverride(%u -> %u) -> %i\n", fromId, toId, success);
     return success;
 }
 

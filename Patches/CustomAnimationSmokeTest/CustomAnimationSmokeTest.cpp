@@ -11,6 +11,7 @@ constexpr const char* SmokeAnimationName = "victory";
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
 using MapResolverAnimationFn = bool(__cdecl*)(uint8_t, uint8_t, uint8_t, const char*);
+using MapAnimationIdOverrideFn = bool(__cdecl*)(uint16_t, uint16_t);
 using LookupAnimationIdFn = uint16_t(__cdecl*)(const char*);
 using LookupAnimationNameByIdFn = const char*(__cdecl*)(uint16_t);
 
@@ -28,10 +29,11 @@ bool InstallSmokeMapping() {
 
     auto registerAnimationWithId = ResolveExport<RegisterAnimationWithIdFn>(core, "RegisterAnimationWithId");
     auto mapResolverAnimation = ResolveExport<MapResolverAnimationFn>(core, "MapResolverAnimation");
+    auto mapAnimationIdOverride = ResolveExport<MapAnimationIdOverrideFn>(core, "MapAnimationIdOverride");
     auto lookupAnimationId = ResolveExport<LookupAnimationIdFn>(core, "LookupAnimationId");
     auto lookupAnimationNameById = ResolveExport<LookupAnimationNameByIdFn>(core, "LookupAnimationNameById");
 
-    if (!registerAnimationWithId || !mapResolverAnimation || !lookupAnimationId || !lookupAnimationNameById) {
+    if (!registerAnimationWithId || !mapResolverAnimation || !mapAnimationIdOverride || !lookupAnimationId || !lookupAnimationNameById) {
         debugLog("[CustomAnimationSmokeTest] ERROR: required CustomAnimationCore export is missing\n");
         return false;
     }
@@ -72,8 +74,21 @@ bool InstallSmokeMapping() {
         return false;
     }
 
+    const uint16_t pauseAnimationIds[] = { 6, 7, 8, 9, 12, 13, 14, 15 };
+    for (uint16_t pauseId : pauseAnimationIds) {
+        if (!mapAnimationIdOverride(pauseId, SmokeAnimationId)) {
+            debugLog(
+                "[CustomAnimationSmokeTest] ERROR: failed to map pause/idle id %u to %s/%u\n",
+                pauseId,
+                SmokeAnimationName,
+                SmokeAnimationId
+            );
+            return false;
+        }
+    }
+
     debugLog(
-        "[CustomAnimationSmokeTest] Installed wildcard mapping family=any keys=(*,*) -> %s / id %u\n",
+        "[CustomAnimationSmokeTest] Installed wildcard combat mapping and pause/idle remaps -> %s / id %u\n",
         SmokeAnimationName,
         SmokeAnimationId
     );

@@ -1,5 +1,21 @@
 # Issue #98 K1 prototype hooks.
 #
+# CSWCAnimBase::SetAnimation entry.
+#
+# Development patches can remap animation IDs before the engine forwards them
+# to the concrete animation implementation. The current smoke test maps vanilla
+# pause/idle IDs to the custom `victory` ID, so loading a save should
+# immediately exercise the custom model clip as idle.
+[[hooks]]
+address = 0x0069d4f0
+type = "detour"
+function = "OverrideSetAnimationId"
+original_bytes = [0x8b, 0x54, 0x24, 0x10, 0x8b, 0x01]
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # CSWCAnimBase::SetAnimation animation-id stack slot.
+
 # These first hooks target the shared fallback epilogues in the client-side
 # attack animation ID resolvers. They let vanilla compute an animation ID, then
 # allow CustomAnimationCore to swap ESI and emulate the original function

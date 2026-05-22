@@ -4,11 +4,13 @@ EXPORTS
     RegisterAnimationWithId
     MapWeaponAction
     MapResolverAnimation
+    MapAnimationIdOverride
     LookupRegisteredAnim
     LookupRegisteredResolverAnim
     LookupAnimationId
     LookupAnimationNameById
     ClearCustomAnimationRegistry
+    OverrideSetAnimationId
     OverrideMeleeDefaultAnimationId
     OverrideRangedDefaultAnimationId
     OverrideAnimationNameLookup

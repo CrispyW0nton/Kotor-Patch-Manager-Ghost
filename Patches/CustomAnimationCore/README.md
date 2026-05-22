@@ -8,6 +8,7 @@ The first pass exposes a small exported registry that downstream patches can use
 - `RegisterAnimationWithId(const char* name, uint16_t id) -> bool`
 - `MapWeaponAction(uint8_t weaponType, uint8_t actionKind, const char* animName) -> bool`
 - `MapResolverAnimation(uint8_t resolverFamily, uint8_t key1, uint8_t key2, const char* animName) -> bool`
+- `MapAnimationIdOverride(uint16_t fromId, uint16_t toId) -> bool`
 - `LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) -> const char*`
 - `LookupRegisteredResolverAnim(uint8_t resolverFamily, uint8_t key1, uint8_t key2) -> const char*`
 - `LookupAnimationId(const char* name) -> uint16_t`
@@ -22,6 +23,7 @@ Registry rules for the v0 prototype:
 - Registering the same name with a different ID fails.
 - Registering a different name with an already-used ID fails.
 - `MapResolverAnimation` only accepts names that are already registered.
+- `MapAnimationIdOverride` only accepts target IDs that are already registered.
 - `MapWeaponAction` is retained as a compatibility wrapper for family `0`
   mappings.
 
@@ -36,6 +38,7 @@ The first K1 prototype hooks the fallback/default return paths in:
 - `CSWCCreature::UpdateMeleeAttackData`
 - `CSWCCreature::UpdateRangedAttackData`
 - `CSWCAnimBase::GetAnimationName`
+- `CSWCAnimBase::SetAnimation`
 
 When vanilla falls through to the combat default paths, the hook resolves the
 raw resolver tuple through the family-aware resolver map and swaps the returned
@@ -50,15 +53,22 @@ When `CSWCAnimBase::GetAnimationName` cannot resolve an ID through
 registered animation name into the function's output `CExoString` and resumes
 the vanilla success path. On a miss, it resumes the vanilla failure path.
 
+`CSWCAnimBase::SetAnimation` is hooked at function entry so development patches
+can remap a vanilla animation ID to a registered custom ID before playback is
+forwarded to the concrete animation implementation. The smoke test uses this to
+map vanilla pause/idle IDs to `65000` for live testing. In the current asset
+pipeline this hook is useful for proving the call path, but a malformed MDL
+animation block can still crash earlier during model/animation footprint setup.
+
 Until the loader hook can inject rows into `animations.2da`, downstream patches
 should use `RegisterAnimationWithId` with an ID that is already valid in the
 active `animations.2da` file. `RegisterAnimation` still exists for the future
 loader-backed path, but auto-assigned IDs are not safe for release content yet.
 
 `Patches/CustomAnimationSmokeTest` is the current development harness. It maps
-the global wildcard to custom ID `65000`, then resolves that ID back to
-`victory` through the `GetAnimationName` bypass. This keeps the smoke test out
-of the vanilla `animations.2da` row range while still using a model animation
-that stock character models usually have.
+the global wildcard and vanilla pause/idle animation IDs to custom ID `65000`,
+then resolves that ID back to `victory` through the `GetAnimationName` bypass.
+This keeps the smoke test out of the vanilla `animations.2da` row range while
+still using a model animation that stock character models usually have.
 
 The prototype currently supports the K1 1.03 GOG and CD crack hashes already used by `ScriptExtender`.
