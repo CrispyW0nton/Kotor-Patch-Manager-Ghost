@@ -168,11 +168,22 @@ void ResolveSetAnimationIdOverride(const char* context, uint32_t* animationIdSlo
     }
 
     const uint16_t mappedId = CustomAnimationRegistry::Instance().LookupAnimationIdOverride(vanillaId);
+    const char* registeredName = CustomAnimationRegistry::Instance().LookupAnimationNameById(vanillaId);
 
     static LONG requestLogCount = 0;
     const LONG requestLog = InterlockedIncrement(&requestLogCount);
     if (mappedId == InvalidAnimationId || mappedId == vanillaId) {
-        if (requestLog <= 200) {
+        if (registeredName) {
+            debugLog(
+                "[CustomAnimationCore] %s request #%ld slot=%p registered custom id=%u (%s) pass-through\n",
+                context,
+                requestLog,
+                animationIdSlot,
+                vanillaId,
+                registeredName
+            );
+        }
+        else if (requestLog <= 200) {
             debugLog(
                 "[CustomAnimationCore] %s request #%ld slot=%p id=%u no override\n",
                 context,

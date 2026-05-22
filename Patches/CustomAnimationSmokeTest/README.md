@@ -14,9 +14,9 @@ attach it:
 With both patches installed, any hooked fallback/default combat resolver path
 should log a `CustomAnimationCore` override and return ID `65000`. The
 `GetAnimationName` bypass then resolves that custom ID back to the model
-animation name `victory`. The smoke test intentionally avoids global, idle, and
-pause animation ID remaps now, because those paths can stomp locomotion requests
-and make run/walk appear frozen.
+animation name `victory`. The smoke test intentionally avoids global, idle,
+pause, and locomotion ID remaps now, because those paths can stomp movement
+requests and make run/walk appear frozen.
 
 For local testing, install a supermodel MDL/MDX pair containing that animation
 in Override. The current GhostRigger test asset must export the animation block
