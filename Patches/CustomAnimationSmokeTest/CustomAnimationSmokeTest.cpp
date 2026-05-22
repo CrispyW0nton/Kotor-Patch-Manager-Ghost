@@ -7,6 +7,7 @@ namespace {
 constexpr uint8_t WildcardKey = 0xff;
 constexpr uint8_t ResolverFamilyAny = 0;
 constexpr uint16_t SmokeAnimationId = 65000;
+constexpr uint16_t ObservedIdleAnimationId = 10000;
 constexpr const char* SmokeAnimationName = "victory";
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
@@ -74,7 +75,7 @@ bool InstallSmokeMapping() {
         return false;
     }
 
-    const uint16_t pauseAnimationIds[] = { 6, 7, 8, 9, 12, 13, 14, 15 };
+    const uint16_t pauseAnimationIds[] = { 6, 7, 8, 9, 12, 13, 14, 15, ObservedIdleAnimationId };
     for (uint16_t pauseId : pauseAnimationIds) {
         if (!mapAnimationIdOverride(pauseId, SmokeAnimationId)) {
             debugLog(
@@ -88,7 +89,7 @@ bool InstallSmokeMapping() {
     }
 
     debugLog(
-        "[CustomAnimationSmokeTest] Installed wildcard combat mapping and pause/idle remaps -> %s / id %u\n",
+        "[CustomAnimationSmokeTest] Installed wildcard combat mapping and targeted pause/idle remaps -> %s / id %u\n",
         SmokeAnimationName,
         SmokeAnimationId
     );

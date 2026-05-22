@@ -154,7 +154,7 @@ extern "C" uint32_t __cdecl ResolveCustomAnimationNameFromId(
     return 1;
 }
 
-void ResolveSetAnimationIdOverride(uint32_t* animationIdSlot) {
+void ResolveSetAnimationIdOverride(const char* context, uint32_t* animationIdSlot) {
     if (!animationIdSlot) {
         return;
     }
@@ -168,7 +168,19 @@ void ResolveSetAnimationIdOverride(uint32_t* animationIdSlot) {
     }
 
     const uint16_t mappedId = CustomAnimationRegistry::Instance().LookupAnimationIdOverride(vanillaId);
+
+    static LONG requestLogCount = 0;
+    const LONG requestLog = InterlockedIncrement(&requestLogCount);
     if (mappedId == InvalidAnimationId || mappedId == vanillaId) {
+        if (requestLog <= 200) {
+            debugLog(
+                "[CustomAnimationCore] %s request #%ld slot=%p id=%u no override\n",
+                context,
+                requestLog,
+                animationIdSlot,
+                vanillaId
+            );
+        }
         return;
     }
 
@@ -179,12 +191,13 @@ void ResolveSetAnimationIdOverride(uint32_t* animationIdSlot) {
         return;
     }
 
-    static LONG logCount = 0;
-    const LONG currentLog = InterlockedIncrement(&logCount);
-    if (currentLog <= 25) {
+    if (requestLog <= 200) {
         const char* mappedName = CustomAnimationRegistry::Instance().LookupAnimationNameById(mappedId);
         debugLog(
-            "[CustomAnimationCore] SetAnimation id override %u -> %u (%s)\n",
+            "[CustomAnimationCore] %s request #%ld slot=%p id override %u -> %u (%s)\n",
+            context,
+            requestLog,
+            animationIdSlot,
             vanillaId,
             mappedId,
             mappedName ? mappedName : "<unknown>"
@@ -193,7 +206,11 @@ void ResolveSetAnimationIdOverride(uint32_t* animationIdSlot) {
 }
 
 extern "C" void __cdecl OverrideSetAnimationId(uint32_t* animationIdSlot) {
-    ResolveSetAnimationIdOverride(animationIdSlot);
+    ResolveSetAnimationIdOverride("SetAnimation", animationIdSlot);
+}
+
+extern "C" void __cdecl OverrideSetAnimationInternalId(uint32_t* animationIdSlot) {
+    ResolveSetAnimationIdOverride("SetAnimationInternal", animationIdSlot);
 }
 
 extern "C" __declspec(naked) void __cdecl OverrideMeleeDefaultAnimationId() {

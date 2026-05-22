@@ -11,6 +11,7 @@ EXPORTS
     LookupAnimationNameById
     ClearCustomAnimationRegistry
     OverrideSetAnimationId
+    OverrideSetAnimationInternalId
     OverrideMeleeDefaultAnimationId
     OverrideRangedDefaultAnimationId
     OverrideAnimationNameLookup

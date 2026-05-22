@@ -16,6 +16,51 @@ original_bytes = [0x8b, 0x54, 0x24, 0x10, 0x8b, 0x01]
 source = "esp+4"
 type = "pointer" # CSWCAnimBase::SetAnimation animation-id stack slot.
 
+# CSWCAnimBaseHeadWield::SetAnimation entry.
+#
+# Player and humanoid creature bodies commonly dispatch through the concrete
+# head/wield animation implementation instead of the CSWCAnimBase wrapper
+# above. Hooking this entry gives the smoke test telemetry on the live body
+# path and lets the same registry override rewrite the ID before either
+# underlying SetAnimationInternal call consumes it.
+[[hooks]]
+address = 0x006993b0
+type = "detour"
+function = "OverrideSetAnimationId"
+original_bytes = [0x53, 0x8b, 0x5c, 0x24, 0x10]
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # CSWCAnimBaseHeadWield::SetAnimation animation-id stack slot.
+
+# CSWCAnimBaseWield::SetAnimationInternal entry.
+#
+# HeadWield forwards into this path for wielded sub-objects. The animation ID
+# is the second explicit thiscall parameter, so it lives at stack +8.
+[[hooks]]
+address = 0x0069a3e0
+type = "detour"
+function = "OverrideSetAnimationInternalId"
+original_bytes = [0x6a, 0xff, 0x64, 0xa1, 0x00, 0x00, 0x00, 0x00]
+
+[[hooks.parameters]]
+source = "esp+8"
+type = "pointer" # CSWCAnimBaseWield::SetAnimationInternal animation-id stack slot.
+
+# CSWCAnimBaseTW::SetAnimationInternal entry.
+#
+# This is the body/torso path that ultimately falls back to
+# CSWCAnimBase::SetAnimationInternal. It is the key visual gate for PMBAM.
+[[hooks]]
+address = 0x0069c940
+type = "detour"
+function = "OverrideSetAnimationInternalId"
+original_bytes = [0x64, 0xa1, 0x00, 0x00, 0x00, 0x00]
+
+[[hooks.parameters]]
+source = "esp+8"
+type = "pointer" # CSWCAnimBaseTW::SetAnimationInternal animation-id stack slot.
+
 # These first hooks target the shared fallback epilogues in the client-side
 # attack animation ID resolvers. They let vanilla compute an animation ID, then
 # allow CustomAnimationCore to swap ESI and emulate the original function
