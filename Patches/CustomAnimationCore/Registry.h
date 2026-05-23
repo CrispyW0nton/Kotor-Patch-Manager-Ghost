@@ -34,10 +34,12 @@ public:
     bool MapResolverAnimation(uint8_t resolverFamily, uint8_t key1, uint8_t key2, const char* animName);
     bool MapAnimationIdOverride(uint16_t fromId, uint16_t toId);
     bool MapPlayAnimationNameOverride(const char* fromName, const char* toName);
+    bool MapPlayAnimationNameOverrideForModel(const char* modelName, const char* fromName, const char* toName);
     const char* LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind);
     const char* LookupRegisteredResolverAnim(uint8_t resolverFamily, uint8_t key1, uint8_t key2);
     uint16_t LookupAnimationIdOverride(uint16_t fromId);
     const char* LookupPlayAnimationNameOverride(const char* fromName);
+    const char* LookupPlayAnimationNameOverrideForModel(const char* modelName, const char* fromName);
     uint16_t LookupAnimationId(const char* name);
     const char* LookupAnimationNameById(uint16_t id);
     void Clear();
@@ -51,4 +53,5 @@ private:
     std::unordered_map<ResolverKey, std::string, ResolverKeyHash> resolverToName;
     std::unordered_map<uint16_t, uint16_t> animationIdOverrides;
     std::unordered_map<std::string, std::string> playAnimationNameOverrides;
+    std::unordered_map<std::string, std::string> playAnimationNameOverridesByModel;
 };

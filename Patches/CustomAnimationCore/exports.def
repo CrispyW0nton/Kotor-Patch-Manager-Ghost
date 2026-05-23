@@ -6,6 +6,7 @@ EXPORTS
     MapResolverAnimation
     MapAnimationIdOverride
     MapPlayAnimationNameOverride
+    MapPlayAnimationNameOverrideForModel
     LookupRegisteredAnim
     LookupRegisteredResolverAnim
     LookupAnimationId

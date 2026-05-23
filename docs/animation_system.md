@@ -210,11 +210,48 @@ Runtime findings:
 - the current smoke hook now checks the Gob local/add-in model chain before
   mapping, logging `REGISTER_UNAVAILABLE` and keeping vanilla if the requested
   custom animation is absent;
+- the smoke hook now scopes direct-name remaps to body models under test
+  (`PMBAL` and `PMBAM`) so placeables, doors, heads, and other objects that also
+  request `default`/`pause1` are not probed or remapped;
 - a PMBAM save-load pass should now produce either
   `REGISTER_MAPPED ... local_model=PMBAM ... resolved=kpmwin1`, proving engine
   lookup and `AnimRun` construction reach the custom animation, or
   `REGISTER_UNAVAILABLE ... local_model=PMBAM`, proving the live model chain
   does not expose the local animation despite offline MDL readback.
+
+The 2026-05-23 live PMBAM test exposed one more routing issue: the current
+`AnimationTest` save does not load `PMBAM` for the player body. The engine was
+checking `kpmwin1` against `local_model=PMBAL`, while the only installed custom
+animation was in `PMBAM`. Telemetry showed:
+
+```text
+AnimationExists LOOKUP ... name=kpmwin1 availability=missing local_model=PMBAL
+AnimationExists LOOKUP ... name=equip availability=local local_model=PMBAL
+```
+
+That proves the failure was model availability, not name registration. A
+temporary shortcut that copied `PMBAM` to `PMBAL` and rewrote the root name to
+`PMBAL` still crashed during save load before any player `kpmwin1` lookup, so
+renaming one body model as another is not a valid proof route. The next asset
+test must either inject `kpmwin1` into the real vanilla `PMBAL` model while
+preserving its geometry/MDX payload, or use a save/outfit that actually loads
+the already-injected `PMBAM`.
+
+To reduce false failures while this asset routing is sorted out, the smoke test
+now leaves the wildcard custom-ID resolver disabled by default and only maps
+direct `Gob::PlayAnimation` names (`default`, `pause1`) through the availability
+gate for `PMBAL`/`PMBAM`. The custom-ID resolver hooks remain in
+`CustomAnimationCore`; the smoke test should re-enable them only after the live
+model is confirmed to contain the requested local animation.
+
+The model-scoped build survived the next live load pass. Runtime telemetry from
+`animation_patch_runtime_20260523T182401Z.log` showed live gameplay on
+`PMBAL`: `walk` stayed vanilla, `pause1` attempted the scoped proof mapping,
+`REGISTER_UNAVAILABLE` correctly kept the original because `kpmwin1` was absent,
+and `AnimRun CREATE ... name=pause1` confirmed the fallback animation ran. This
+narrows the remaining proof blocker to asset routing/export only: GhostRigger
+must inject local animation `kpmwin1` into the actual vanilla `PMBAL` model used
+by the save, preserving `PMBAL` geometry/MDX byte-for-byte.
 
 ### Tier 5: Demo Patch
 

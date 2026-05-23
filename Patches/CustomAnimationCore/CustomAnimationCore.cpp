@@ -220,6 +220,14 @@ const char* ResolveRegisteredNameForId(uint16_t requestedId, uint16_t* resolvedI
     return animName;
 }
 
+bool ShouldLogInterestingSequence(LONG sequence, const char* name) {
+    if (sequence <= 500) {
+        return true;
+    }
+
+    return IsInterestingAnimationName(name) && (sequence % 1000 == 0);
+}
+
 uint32_t ResolveAnimationOverride(
     const char* source,
     uint8_t resolverFamily,
@@ -426,16 +434,20 @@ extern "C" void __cdecl LogPlayAnimationRequest(void* gob, const char** animName
 
     rawName = SafeReadCString(rawName);
     const uintptr_t caller = SafeReadReturnAddress(animNameSlot);
-    const char* plannedOverride = CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(rawName);
+    void* localModel = SafeReadPointer(gob, 0x58);
+    const char* localModelName = SafeReadAnimationName(localModel);
+    const char* plannedOverride = CustomAnimationRegistry::Instance()
+        .LookupPlayAnimationNameOverrideForModel(localModelName, rawName);
 
     if (requestLog <= 200 || IsInterestingAnimationName(rawName)) {
         debugLog(
-            "[CustomAnimationCore] Gob::PlayAnimation ENTRY #%ld gob=%p caller=%p raw_name=%s planned=%s slot=%p\n",
+            "[CustomAnimationCore] Gob::PlayAnimation ENTRY #%ld gob=%p caller=%p raw_name=%s planned=%s local_model=%s slot=%p\n",
             requestLog,
             gob,
             reinterpret_cast<void*>(caller),
             rawName ? rawName : "<null>",
             plannedOverride ? plannedOverride : "<none>",
+            localModelName ? localModelName : "<null>",
             animNameSlot
         );
     }
@@ -467,25 +479,27 @@ extern "C" const char* __cdecl ResolvePlayAnimationNameRegisterOverride(const ch
     static LONG registerLogCount = 0;
     const LONG registerLog = InterlockedIncrement(&registerLogCount);
     const char* safeName = SafeReadCString(rawName);
-    const char* overrideName = CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(safeName);
+    void* localModel = SafeReadPointer(gob, 0x58);
+    const char* localModelName = SafeReadAnimationName(localModel);
+    const char* overrideName = CustomAnimationRegistry::Instance()
+        .LookupPlayAnimationNameOverrideForModel(localModelName, safeName);
     if (!overrideName) {
         if (registerLog <= 200 || IsInterestingAnimationName(safeName)) {
             debugLog(
-                "[CustomAnimationCore] Gob::PlayAnimation REGISTER_KEEP #%ld gob=%p name=%s\n",
+                "[CustomAnimationCore] Gob::PlayAnimation REGISTER_KEEP #%ld gob=%p name=%s local_model=%s\n",
                 registerLog,
                 gob,
-                safeName ? safeName : "<null>"
+                safeName ? safeName : "<null>",
+                localModelName ? localModelName : "<null>"
             );
         }
         return rawName;
     }
 
-    void* localModel = SafeReadPointer(gob, 0x58);
     void* addInModel = SafeReadPointer(gob, 0x64);
     void* localAnimation = FindAnimationInModelChain(localModel, overrideName);
     void* addInAnimation = localAnimation ? nullptr : FindAnimationInModelChain(addInModel, overrideName);
     void* resolvedAnimation = localAnimation ? localAnimation : addInAnimation;
-    const char* localModelName = SafeReadAnimationName(localModel);
     const char* addInModelName = SafeReadAnimationName(addInModel);
     if (!resolvedAnimation) {
         debugLog(
@@ -551,7 +565,7 @@ extern "C" void __cdecl LogAnimationExistsRequest(void* animBase, uint32_t* anim
 
     uint16_t resolvedId = requestedId;
     const char* registeredName = ResolveRegisteredNameForId(requestedId, &resolvedId);
-    if (requestLog <= 200 || IsInterestingAnimationName(registeredName)) {
+    if (ShouldLogInterestingSequence(requestLog, registeredName)) {
         if (registeredName && resolvedId != requestedId) {
             debugLog(
                 "[CustomAnimationCore] AnimationExists ENTRY #%ld animBase=%p id=%u mapped=%u name=%s\n",
@@ -578,11 +592,31 @@ extern "C" void __cdecl LogAnimationExistsLookup(void* target, const char* animN
     static LONG lookupLogCount = 0;
     const LONG lookupLog = InterlockedIncrement(&lookupLogCount);
     const char* safeName = SafeReadCString(animName);
-    const bool interesting = IsInterestingAnimationName(safeName);
+    const bool shouldLog = ShouldLogInterestingSequence(lookupLog, safeName);
 
-    if (lookupLog <= 200 || interesting) {
+    if (shouldLog && IsInterestingAnimationName(safeName)) {
+        void* localModel = SafeReadPointer(target, 0x58);
+        void* addInModel = SafeReadPointer(target, 0x64);
+        void* localAnimation = FindAnimationInModelChain(localModel, safeName);
+        void* addInAnimation = localAnimation ? nullptr : FindAnimationInModelChain(addInModel, safeName);
+        const char* availability = localAnimation ? "local" : (addInAnimation ? "addin" : "missing");
+        const char* localModelName = SafeReadAnimationName(localModel);
+        const char* addInModelName = SafeReadAnimationName(addInModel);
+
         debugLog(
-            "[CustomAnimationCore] AnimationExists LOOKUP #%ld target=%p name=%s\n",
+            "[CustomAnimationCore] AnimationExists LOOKUP #%ld target=%p name=%s availability=%s animation=%p local_model=%s addin_model=%s\n",
+            lookupLog,
+            target,
+            safeName ? safeName : "<null>",
+            availability,
+            localAnimation ? localAnimation : addInAnimation,
+            localModelName ? localModelName : "<null>",
+            addInModelName ? addInModelName : "<null>"
+        );
+    }
+    else if (shouldLog) {
+        debugLog(
+            "[CustomAnimationCore] AnimationExists LOOKUP #%ld target=%p name=%s availability=not_inspected\n",
             lookupLog,
             target,
             safeName ? safeName : "<null>"
@@ -899,6 +933,26 @@ extern "C" bool __cdecl MapPlayAnimationNameOverride(const char* fromName, const
     const bool success = CustomAnimationRegistry::Instance().MapPlayAnimationNameOverride(fromName, toName);
     debugLog(
         "[CustomAnimationCore] MapPlayAnimationNameOverride(%s -> %s) -> %i\n",
+        fromName ? fromName : "<null>",
+        toName ? toName : "<null>",
+        success
+    );
+    return success;
+}
+
+extern "C" bool __cdecl MapPlayAnimationNameOverrideForModel(
+    const char* modelName,
+    const char* fromName,
+    const char* toName
+) {
+    const bool success = CustomAnimationRegistry::Instance().MapPlayAnimationNameOverrideForModel(
+        modelName,
+        fromName,
+        toName
+    );
+    debugLog(
+        "[CustomAnimationCore] MapPlayAnimationNameOverrideForModel(%s:%s -> %s) -> %i\n",
+        modelName ? modelName : "<null>",
         fromName ? fromName : "<null>",
         toName ? toName : "<null>",
         success

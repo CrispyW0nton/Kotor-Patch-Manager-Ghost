@@ -1,10 +1,28 @@
 #include "Registry.h"
+#include <algorithm>
+#include <cctype>
 #include <mutex>
+#include <string>
 
 namespace {
 std::mutex registryMutex;
 constexpr uint16_t InvalidAnimationId = 0xffff;
 constexpr uint16_t FirstDynamicAnimationId = 65000;
+
+std::string NormalizeLookupKey(const char* value) {
+    std::string key(value ? value : "");
+    std::transform(
+        key.begin(),
+        key.end(),
+        key.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); }
+    );
+    return key;
+}
+
+std::string BuildModelPlayOverrideKey(const char* modelName, const char* fromName) {
+    return NormalizeLookupKey(modelName) + "\n" + NormalizeLookupKey(fromName);
+}
 }
 
 bool ResolverKey::operator==(const ResolverKey& other) const {
@@ -132,6 +150,24 @@ bool CustomAnimationRegistry::MapPlayAnimationNameOverride(const char* fromName,
     return true;
 }
 
+bool CustomAnimationRegistry::MapPlayAnimationNameOverrideForModel(
+    const char* modelName,
+    const char* fromName,
+    const char* toName
+) {
+    if (!modelName || !*modelName || !fromName || !*fromName || !toName || !*toName) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(registryMutex);
+    if (nameToId.find(toName) == nameToId.end()) {
+        return false;
+    }
+
+    playAnimationNameOverridesByModel[BuildModelPlayOverrideKey(modelName, fromName)] = toName;
+    return true;
+}
+
 const char* CustomAnimationRegistry::LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) {
     return LookupRegisteredResolverAnim(
         static_cast<uint8_t>(AnimationResolverFamily::Any),
@@ -196,6 +232,32 @@ const char* CustomAnimationRegistry::LookupPlayAnimationNameOverride(const char*
     return existing->second.c_str();
 }
 
+const char* CustomAnimationRegistry::LookupPlayAnimationNameOverrideForModel(
+    const char* modelName,
+    const char* fromName
+) {
+    if (!fromName || !*fromName) {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(registryMutex);
+
+    if (modelName && *modelName) {
+        auto modelSpecific = playAnimationNameOverridesByModel.find(
+            BuildModelPlayOverrideKey(modelName, fromName)
+        );
+        if (modelSpecific != playAnimationNameOverridesByModel.end()) {
+            return modelSpecific->second.c_str();
+        }
+    }
+
+    auto generic = playAnimationNameOverrides.find(fromName);
+    if (generic == playAnimationNameOverrides.end()) {
+        return nullptr;
+    }
+    return generic->second.c_str();
+}
+
 uint16_t CustomAnimationRegistry::LookupAnimationId(const char* name) {
     if (!name || !*name) {
         return InvalidAnimationId;
@@ -231,5 +293,6 @@ void CustomAnimationRegistry::Clear() {
     resolverToName.clear();
     animationIdOverrides.clear();
     playAnimationNameOverrides.clear();
+    playAnimationNameOverridesByModel.clear();
     nextId = FirstDynamicAnimationId;
 }
