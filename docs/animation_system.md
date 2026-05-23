@@ -119,6 +119,16 @@ The detour should check `(weaponType, actionKind)` in the registry and fall back
 
 Prototype note: the first implementation hooks the fallback/default epilogues in `CSWCCreature::UpdateMeleeAttackData` at `0x0061406c` and `CSWCCreature::UpdateRangedAttackData` at `0x0061428c`. This is narrower than replacing the client resolver. It catches unhandled/default tuples, swaps `ESI` to the mapped animation ID, and then lets the original return sequence move that value into `EAX`.
 
+### Runtime String Assignment Note
+
+Live testing of the `GetAnimationName` hook showed that the registry override can fire while the visual playback still falls back to an A-pose if the output `CExoString` is populated incorrectly. Ghidra identifies `CExoString::operator=` at `0x005e5140` as:
+
+```cpp
+char** __thiscall CExoString::operator=(CExoString* this, char* value)
+```
+
+That means hook code must assign the resolved animation name by passing a raw null-terminated `char*` to the engine operator. Passing another `CExoString` object pointer into this overload is invalid and can make `CSWCAnimBase::GetAnimationName` report an override in telemetry without producing a usable playback name downstream.
+
 ### Tier 5: Demo Patch
 
 Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.
