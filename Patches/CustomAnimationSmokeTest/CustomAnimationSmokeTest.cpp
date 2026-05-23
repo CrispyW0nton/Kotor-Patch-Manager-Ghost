@@ -8,23 +8,14 @@ constexpr uint8_t WildcardKey = 0xff;
 constexpr uint8_t ResolverFamilyAny = 0;
 constexpr uint16_t SmokeAnimationId = 10000;
 constexpr const char* SmokeAnimationName = "kpmwin1";
-constexpr uint16_t SmokeAnimationProbeIds[] = {
-    SmokeAnimationId,
-    10001,
-    10030,
-    10038,
-    10039,
-    10040,
-    10041,
-    10042,
-    10154,
-    10155,
-    10246,
+constexpr const char* SmokePlayNameOverrides[] = {
+    "default",
+    "pause1",
 };
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
 using MapResolverAnimationFn = bool(__cdecl*)(uint8_t, uint8_t, uint8_t, const char*);
-using MapAnimationIdOverrideFn = bool(__cdecl*)(uint16_t, uint16_t);
+using MapPlayAnimationNameOverrideFn = bool(__cdecl*)(const char*, const char*);
 using LookupAnimationIdFn = uint16_t(__cdecl*)(const char*);
 using LookupAnimationNameByIdFn = const char*(__cdecl*)(uint16_t);
 
@@ -42,11 +33,11 @@ bool InstallSmokeMapping() {
 
     auto registerAnimationWithId = ResolveExport<RegisterAnimationWithIdFn>(core, "RegisterAnimationWithId");
     auto mapResolverAnimation = ResolveExport<MapResolverAnimationFn>(core, "MapResolverAnimation");
-    auto mapAnimationIdOverride = ResolveExport<MapAnimationIdOverrideFn>(core, "MapAnimationIdOverride");
+    auto mapPlayAnimationNameOverride = ResolveExport<MapPlayAnimationNameOverrideFn>(core, "MapPlayAnimationNameOverride");
     auto lookupAnimationId = ResolveExport<LookupAnimationIdFn>(core, "LookupAnimationId");
     auto lookupAnimationNameById = ResolveExport<LookupAnimationNameByIdFn>(core, "LookupAnimationNameById");
 
-    if (!registerAnimationWithId || !mapResolverAnimation || !mapAnimationIdOverride || !lookupAnimationId || !lookupAnimationNameById) {
+    if (!registerAnimationWithId || !mapResolverAnimation || !mapPlayAnimationNameOverride || !lookupAnimationId || !lookupAnimationNameById) {
         debugLog("[CustomAnimationSmokeTest] ERROR: required CustomAnimationCore export is missing\n");
         return false;
     }
@@ -87,19 +78,18 @@ bool InstallSmokeMapping() {
         return false;
     }
 
-    for (uint16_t probeId : SmokeAnimationProbeIds) {
-        if (!mapAnimationIdOverride(probeId, SmokeAnimationId)) {
+    for (const char* fromName : SmokePlayNameOverrides) {
+        if (!mapPlayAnimationNameOverride(fromName, SmokeAnimationName)) {
             debugLog(
-                "[CustomAnimationSmokeTest] ERROR: failed to install loaded-save proof mapping %u -> %u\n",
-                probeId,
-                SmokeAnimationId
+                "[CustomAnimationSmokeTest] ERROR: failed to install direct play-name proof mapping %s -> %s\n",
+                fromName,
+                SmokeAnimationName
             );
             return false;
         }
         debugLog(
-            "[CustomAnimationSmokeTest] Loaded-save proof mapping %u -> %u (%s)\n",
-            probeId,
-            SmokeAnimationId,
+            "[CustomAnimationSmokeTest] Direct play-name proof mapping %s -> %s\n",
+            fromName,
             SmokeAnimationName
         );
     }
@@ -110,8 +100,7 @@ bool InstallSmokeMapping() {
         SmokeAnimationName
     );
     debugLog(
-        "[CustomAnimationSmokeTest] Loaded-save idle requests for animation %u should resolve to %s\n",
-        SmokeAnimationId,
+        "[CustomAnimationSmokeTest] Direct Gob::PlayAnimation requests should resolve to %s\n",
         SmokeAnimationName
     );
     return true;

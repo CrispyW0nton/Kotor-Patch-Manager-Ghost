@@ -273,6 +273,28 @@ extern "C" void __cdecl LogPlayAnimationRequest(void* gob, const char** animName
         animName = nullptr;
     }
 
+    const char* overrideName = CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(animName);
+    if (overrideName && animNameSlot) {
+        __try {
+            *animNameSlot = overrideName;
+            debugLog(
+                "[CustomAnimationCore] Gob::PlayAnimation name override #%ld gob=%p %s -> %s\n",
+                requestLog,
+                gob,
+                animName ? animName : "<null>",
+                overrideName
+            );
+            animName = overrideName;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            debugLog(
+                "[CustomAnimationCore] Gob::PlayAnimation name override #%ld failed slot=%p\n",
+                requestLog,
+                animNameSlot
+            );
+        }
+    }
+
     if (requestLog > 120 && !IsInterestingAnimationName(animName)) {
         return;
     }
@@ -470,6 +492,17 @@ extern "C" bool __cdecl MapResolverAnimation(
 extern "C" bool __cdecl MapAnimationIdOverride(uint16_t fromId, uint16_t toId) {
     const bool success = CustomAnimationRegistry::Instance().MapAnimationIdOverride(fromId, toId);
     debugLog("[CustomAnimationCore] MapAnimationIdOverride(%u -> %u) -> %i\n", fromId, toId, success);
+    return success;
+}
+
+extern "C" bool __cdecl MapPlayAnimationNameOverride(const char* fromName, const char* toName) {
+    const bool success = CustomAnimationRegistry::Instance().MapPlayAnimationNameOverride(fromName, toName);
+    debugLog(
+        "[CustomAnimationCore] MapPlayAnimationNameOverride(%s -> %s) -> %i\n",
+        fromName ? fromName : "<null>",
+        toName ? toName : "<null>",
+        success
+    );
     return success;
 }
 

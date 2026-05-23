@@ -5,6 +5,7 @@ EXPORTS
     MapWeaponAction
     MapResolverAnimation
     MapAnimationIdOverride
+    MapPlayAnimationNameOverride
     LookupRegisteredAnim
     LookupRegisteredResolverAnim
     LookupAnimationId

@@ -118,6 +118,20 @@ bool CustomAnimationRegistry::MapAnimationIdOverride(uint16_t fromId, uint16_t t
     return true;
 }
 
+bool CustomAnimationRegistry::MapPlayAnimationNameOverride(const char* fromName, const char* toName) {
+    if (!fromName || !*fromName || !toName || !*toName) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(registryMutex);
+    if (nameToId.find(toName) == nameToId.end()) {
+        return false;
+    }
+
+    playAnimationNameOverrides[fromName] = toName;
+    return true;
+}
+
 const char* CustomAnimationRegistry::LookupRegisteredAnim(uint8_t weaponType, uint8_t actionKind) {
     return LookupRegisteredResolverAnim(
         static_cast<uint8_t>(AnimationResolverFamily::Any),
@@ -168,6 +182,20 @@ uint16_t CustomAnimationRegistry::LookupAnimationIdOverride(uint16_t fromId) {
     return existing->second;
 }
 
+const char* CustomAnimationRegistry::LookupPlayAnimationNameOverride(const char* fromName) {
+    if (!fromName || !*fromName) {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> lock(registryMutex);
+
+    auto existing = playAnimationNameOverrides.find(fromName);
+    if (existing == playAnimationNameOverrides.end()) {
+        return nullptr;
+    }
+    return existing->second.c_str();
+}
+
 uint16_t CustomAnimationRegistry::LookupAnimationId(const char* name) {
     if (!name || !*name) {
         return InvalidAnimationId;
@@ -202,5 +230,6 @@ void CustomAnimationRegistry::Clear() {
     idToName.clear();
     resolverToName.clear();
     animationIdOverrides.clear();
+    playAnimationNameOverrides.clear();
     nextId = FirstDynamicAnimationId;
 }
