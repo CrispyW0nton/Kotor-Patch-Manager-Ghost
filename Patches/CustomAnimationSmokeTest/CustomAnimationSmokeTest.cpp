@@ -7,7 +7,7 @@ namespace {
 constexpr uint8_t WildcardKey = 0xff;
 constexpr uint8_t ResolverFamilyAny = 0;
 constexpr uint16_t SmokeAnimationId = 10000;
-constexpr const char* SmokeAnimationName = "dance";
+constexpr const char* SmokeAnimationName = "kpmwin1";
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
 using MapResolverAnimationFn = bool(__cdecl*)(uint8_t, uint8_t, uint8_t, const char*);

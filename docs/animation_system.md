@@ -129,6 +129,18 @@ char** __thiscall CExoString::operator=(CExoString* this, char* value)
 
 That means hook code must assign the resolved animation name by passing a raw null-terminated `char*` to the engine operator. Passing another `CExoString` object pointer into this overload is invalid and can make `CSWCAnimBase::GetAnimationName` report an override in telemetry without producing a usable playback name downstream.
 
+### Local Animation MDL Footprint Note
+
+Live tests with a GhostRigger-injected local `PMBAM` animation named `kpmwin1` reached a consistent K1 crash during save load:
+
+- Windows fault: `swkotor.exe + 0x37f3c`, exception `0xc0000005`.
+- Ghidra target: `UpdateAnimFootprint` at `0x00437db0`, faulting instruction `0x00437f3c`.
+- Faulting access: the engine reads `[node + 0x30]` as child count, `[node + 0x2c]` as the converted child-pointer array, then dereferences `[childArray + index * 4]`.
+
+The raw exported file is PyKotor-readable, has a full 61-node local animation tree, and has in-bounds raw child arrays. The crash happens after `InputBinary::ResetAnimation` calls `ResetMdlNode` and then `UpdateAnimFootprint`, so the current failure is likely a stricter runtime-layout expectation, not a registry/name-resolution failure.
+
+One strong layout difference from vanilla supermodel animations: vanilla animation nodes are stored in depth-first tree order, with controller arrays/data generally after child subtrees. The current injected `kpmwin1` block stores each node's controller data before that node's children. KOTOR's footprint pass appears sensitive to that binary layout, even though a tolerant reader can resolve the offsets.
+
 ### Tier 5: Demo Patch
 
 Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.

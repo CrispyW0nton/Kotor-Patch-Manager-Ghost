@@ -59,6 +59,7 @@ bool IsInterestingAnimationName(const char* name) {
     __try {
         return std::strstr(name, "dance")
             || std::strstr(name, "victory")
+            || std::strstr(name, "kpmwin1")
             || std::strstr(name, "pause")
             || std::strstr(name, "walk")
             || std::strstr(name, "run");
