@@ -141,6 +141,53 @@ The raw exported file is PyKotor-readable, has a full 61-node local animation tr
 
 One strong layout difference from vanilla supermodel animations: vanilla animation nodes are stored in depth-first tree order, with controller arrays/data generally after child subtrees. The current injected `kpmwin1` block stores each node's controller data before that node's children. KOTOR's footprint pass appears sensitive to that binary layout, even though a tolerant reader can resolve the offsets.
 
+### Live Custom ID Proof and Current Asset Blocker
+
+After GhostRigger switched the injected animation block to depth-first
+serialization, the same save loaded without the `UpdateAnimFootprint` crash. The
+next failure mode was a visual A-pose. Debug telemetry showed the save was
+requesting high animation IDs such as `10030`, `10038` through `10042`, `10154`,
+`10155`, and `10246`, not only the smoke-test proof ID `10000`.
+
+`CustomAnimationCore` now lets `CSWCAnimBase::GetAnimationName` follow
+`MapAnimationIdOverride` entries. With the observed save-load IDs mapped to
+proof ID `10000`, the hook logs entries like:
+
+```text
+GetAnimationName override id 10030 -> 10000 (kpmwin1)
+```
+
+A control build then mapped the same IDs to vanilla `dance`. In game, the player
+loaded into the save dancing. Runtime telemetry reached:
+
+```text
+Base PlayAnimation ... name=dance
+Gob::PlayAnimation ... name=dance
+```
+
+That proves the KPM custom-ID/name path is viable. The remaining `kpmwin1`
+A-pose is therefore an asset/export problem, not a registry or hook problem.
+
+PyKotor inspection of the live Override `PMBAM` reports:
+
+- local animation `kpmwin1`, root model `PMBAM`, length `10.0666666`
+  seconds;
+- `61` animation nodes matching the `PMBAM` model hierarchy exactly;
+- `61` orientation controllers and `3` position controllers;
+- `302` rows per controller.
+
+However, the controller values contain very little actual motion:
+
+- `42 / 61` orientation tracks move less than `0.1` degrees from first frame;
+- only `2 / 61` orientation tracks move more than `5` degrees;
+- pelvis/root position movement is about `0.02` game units at most.
+
+The current GhostRigger-side blocker is likely not binary readability,
+name-table casing, raw child traversal, or tree parity. It is that the reverse
+retarget/export path is writing mostly rest-pose controller values. The next
+asset-side fix should validate source-vs-export motion amplitude per mapped
+bone before installing the MDL.
+
 ### Tier 5: Demo Patch
 
 Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.

@@ -156,9 +156,17 @@ extern "C" uint32_t __cdecl ResolveCustomAnimationNameFromId(
     uint32_t animationId,
     void* outputString
 ) {
-    const char* animName = CustomAnimationRegistry::Instance().LookupAnimationNameById(
-        static_cast<uint16_t>(animationId & 0xffff)
-    );
+    const uint16_t requestedId = static_cast<uint16_t>(animationId & 0xffff);
+    uint16_t resolvedId = requestedId;
+    const char* animName = CustomAnimationRegistry::Instance().LookupAnimationNameById(requestedId);
+    if (!animName) {
+        const uint16_t mappedId = CustomAnimationRegistry::Instance().LookupAnimationIdOverride(requestedId);
+        if (mappedId != InvalidAnimationId) {
+            resolvedId = mappedId;
+            animName = CustomAnimationRegistry::Instance().LookupAnimationNameById(mappedId);
+        }
+    }
+
     if (!animName) {
         debugLog("[CustomAnimationCore] GetAnimationName miss for id %u\n", animationId);
         return 0;
@@ -169,7 +177,17 @@ extern "C" uint32_t __cdecl ResolveCustomAnimationNameFromId(
         return 0;
     }
 
-    debugLog("[CustomAnimationCore] GetAnimationName override id %u -> %s\n", animationId, animName);
+    if (resolvedId != requestedId) {
+        debugLog(
+            "[CustomAnimationCore] GetAnimationName override id %u -> %u (%s)\n",
+            animationId,
+            resolvedId,
+            animName
+        );
+    }
+    else {
+        debugLog("[CustomAnimationCore] GetAnimationName override id %u -> %s\n", animationId, animName);
+    }
     return 1;
 }
 

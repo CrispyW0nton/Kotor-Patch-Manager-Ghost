@@ -68,9 +68,13 @@ active `animations.2da` file. `RegisterAnimation` still exists for the future
 loader-backed path, but auto-assigned IDs are not safe for release content yet.
 
 `Patches/CustomAnimationSmokeTest` is the current development harness. It
-registers custom ID `65000` for `victory`, installs the family-agnostic wildcard
-resolver mapping, and resolves that ID back to `victory` through the
-`GetAnimationName` bypass. This keeps the smoke test out of the vanilla
-`animations.2da` row range while avoiding broad idle/locomotion remaps.
+registers proof ID `10000`, installs the family-agnostic wildcard resolver
+mapping, and resolves observed save-load animation IDs back to the registered
+name through the `GetAnimationName` bypass. A live control run mapped those same
+IDs to vanilla `dance` and reached both `Base PlayAnimation` and
+`Gob::PlayAnimation`, proving the registry/name path. The intended custom target
+is currently `kpmwin1`; if it visually A-poses while the same IDs can play
+`dance`, the remaining issue is the exported MDL animation payload rather than
+the KPM hook path.
 
 The prototype currently supports the K1 1.03 GOG and CD crack hashes already used by `ScriptExtender`.

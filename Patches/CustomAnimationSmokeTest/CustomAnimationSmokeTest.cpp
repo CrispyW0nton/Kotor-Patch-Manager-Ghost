@@ -8,6 +8,19 @@ constexpr uint8_t WildcardKey = 0xff;
 constexpr uint8_t ResolverFamilyAny = 0;
 constexpr uint16_t SmokeAnimationId = 10000;
 constexpr const char* SmokeAnimationName = "kpmwin1";
+constexpr uint16_t SmokeAnimationProbeIds[] = {
+    SmokeAnimationId,
+    10001,
+    10030,
+    10038,
+    10039,
+    10040,
+    10041,
+    10042,
+    10154,
+    10155,
+    10246,
+};
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
 using MapResolverAnimationFn = bool(__cdecl*)(uint8_t, uint8_t, uint8_t, const char*);
@@ -74,13 +87,21 @@ bool InstallSmokeMapping() {
         return false;
     }
 
-    if (!mapAnimationIdOverride(SmokeAnimationId, SmokeAnimationId)) {
+    for (uint16_t probeId : SmokeAnimationProbeIds) {
+        if (!mapAnimationIdOverride(probeId, SmokeAnimationId)) {
+            debugLog(
+                "[CustomAnimationSmokeTest] ERROR: failed to install loaded-save proof mapping %u -> %u\n",
+                probeId,
+                SmokeAnimationId
+            );
+            return false;
+        }
         debugLog(
-            "[CustomAnimationSmokeTest] ERROR: failed to install in-range proof mapping %u -> %u\n",
+            "[CustomAnimationSmokeTest] Loaded-save proof mapping %u -> %u (%s)\n",
+            probeId,
             SmokeAnimationId,
-            SmokeAnimationId
+            SmokeAnimationName
         );
-        return false;
     }
 
     debugLog(
