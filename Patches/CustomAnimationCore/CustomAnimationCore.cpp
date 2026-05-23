@@ -3,13 +3,26 @@
 #include "GameAPI/GameVersion.h"
 #include "Registry.h"
 
+#include <cstdint>
 #include <cstring>
+#include <string.h>
 
 namespace {
 constexpr uint16_t InvalidAnimationId = 0xffff;
+constexpr size_t LastAnimationNameCapacity = 64;
 
 using CExoStringAssignFn = void*(__thiscall*)(void* thisPtr, char* value);
 CExoStringAssignFn cExoStringAssign = nullptr;
+
+struct LastAnimationExistsProbe {
+    LONG sequence = 0;
+    void* animBase = nullptr;
+    void* target = nullptr;
+    uint16_t animationId = InvalidAnimationId;
+    char name[LastAnimationNameCapacity] = {};
+};
+
+LastAnimationExistsProbe lastAnimationExistsProbe;
 
 uint8_t LowByteOrZero(const uint32_t* value) {
     if (!value) {
@@ -67,6 +80,144 @@ bool IsInterestingAnimationName(const char* name) {
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return false;
     }
+}
+
+void CopyProbeName(char* destination, const char* source) {
+    if (!destination) {
+        return;
+    }
+
+    destination[0] = '\0';
+    if (!source) {
+        return;
+    }
+
+    __try {
+        std::strncpy(destination, source, LastAnimationNameCapacity - 1);
+        destination[LastAnimationNameCapacity - 1] = '\0';
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        destination[0] = '\0';
+    }
+}
+
+const char* SafeReadCString(const char* value) {
+    if (!value) {
+        return nullptr;
+    }
+
+    __try {
+        volatile char first = value[0];
+        (void)first;
+        return value;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return nullptr;
+    }
+}
+
+void* SafeReadPointer(void* base, size_t offset) {
+    if (!base) {
+        return nullptr;
+    }
+
+    __try {
+        return *reinterpret_cast<void**>(static_cast<uint8_t*>(base) + offset);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return nullptr;
+    }
+}
+
+int32_t SafeReadInt32(void* base, size_t offset) {
+    if (!base) {
+        return 0;
+    }
+
+    __try {
+        return *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(base) + offset);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+float SafeReadFloat(void* base, size_t offset) {
+    if (!base) {
+        return 0.0f;
+    }
+
+    __try {
+        return *reinterpret_cast<float*>(static_cast<uint8_t*>(base) + offset);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0.0f;
+    }
+}
+
+const char* SafeReadAnimationName(void* animation) {
+    if (!animation) {
+        return nullptr;
+    }
+
+    return SafeReadCString(reinterpret_cast<const char*>(static_cast<uint8_t*>(animation) + 0x8));
+}
+
+void* FindAnimationInModelChain(void* model, const char* animName, int depth = 0) {
+    if (!model || !animName || depth > 16) {
+        return nullptr;
+    }
+
+    const int32_t localAnimCount = SafeReadInt32(model, 0x5c);
+    void* localAnimArray = SafeReadPointer(model, 0x58);
+    if (localAnimCount > 0 && localAnimCount < 4096 && localAnimArray) {
+        for (int32_t index = 0; index < localAnimCount; ++index) {
+            void* animation = nullptr;
+            __try {
+                animation = *(reinterpret_cast<void**>(localAnimArray) + index);
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER) {
+                animation = nullptr;
+            }
+
+            const char* candidateName = SafeReadAnimationName(animation);
+            if (candidateName && _stricmp(candidateName, animName) == 0) {
+                return animation;
+            }
+        }
+    }
+
+    return FindAnimationInModelChain(SafeReadPointer(model, 0x64), animName, depth + 1);
+}
+
+uintptr_t SafeReadReturnAddress(const char** stackSlot) {
+    if (!stackSlot) {
+        return 0;
+    }
+
+    __try {
+        return reinterpret_cast<uintptr_t>(*(stackSlot - 1));
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+const char* ResolveRegisteredNameForId(uint16_t requestedId, uint16_t* resolvedIdOut = nullptr) {
+    uint16_t resolvedId = requestedId;
+    const char* animName = CustomAnimationRegistry::Instance().LookupAnimationNameById(requestedId);
+    if (!animName) {
+        const uint16_t mappedId = CustomAnimationRegistry::Instance().LookupAnimationIdOverride(requestedId);
+        if (mappedId != InvalidAnimationId) {
+            resolvedId = mappedId;
+            animName = CustomAnimationRegistry::Instance().LookupAnimationNameById(mappedId);
+        }
+    }
+
+    if (resolvedIdOut) {
+        *resolvedIdOut = resolvedId;
+    }
+    return animName;
 }
 
 uint32_t ResolveAnimationOverride(
@@ -265,56 +416,305 @@ extern "C" void __cdecl LogPlayAnimationRequest(void* gob, const char** animName
     static LONG requestLogCount = 0;
     const LONG requestLog = InterlockedIncrement(&requestLogCount);
 
-    const char* animName = nullptr;
+    const char* rawName = nullptr;
     __try {
-        animName = animNameSlot ? *animNameSlot : nullptr;
+        rawName = animNameSlot ? *animNameSlot : nullptr;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
-        animName = nullptr;
+        rawName = nullptr;
     }
 
-    const char* overrideName = CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(animName);
-    if (overrideName && animNameSlot) {
-        __try {
-            *animNameSlot = overrideName;
-            debugLog(
-                "[CustomAnimationCore] Gob::PlayAnimation name override #%ld gob=%p %s -> %s\n",
-                requestLog,
-                gob,
-                animName ? animName : "<null>",
-                overrideName
-            );
-            animName = overrideName;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER) {
-            debugLog(
-                "[CustomAnimationCore] Gob::PlayAnimation name override #%ld failed slot=%p\n",
-                requestLog,
-                animNameSlot
-            );
-        }
+    rawName = SafeReadCString(rawName);
+    const uintptr_t caller = SafeReadReturnAddress(animNameSlot);
+    const char* plannedOverride = CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(rawName);
+
+    if (requestLog <= 200 || IsInterestingAnimationName(rawName)) {
+        debugLog(
+            "[CustomAnimationCore] Gob::PlayAnimation ENTRY #%ld gob=%p caller=%p raw_name=%s planned=%s slot=%p\n",
+            requestLog,
+            gob,
+            reinterpret_cast<void*>(caller),
+            rawName ? rawName : "<null>",
+            plannedOverride ? plannedOverride : "<none>",
+            animNameSlot
+        );
     }
 
-    if (requestLog > 120 && !IsInterestingAnimationName(animName)) {
+    if (requestLog > 120 && !IsInterestingAnimationName(rawName) && !plannedOverride) {
         return;
     }
 
     __try {
         debugLog(
-            "[CustomAnimationCore] Gob::PlayAnimation request #%ld gob=%p name=%s\n",
+            "[CustomAnimationCore] Gob::PlayAnimation ENTRY_DONE #%ld gob=%p raw_name=%s caller=%p\n",
             requestLog,
             gob,
-            animName ? animName : "<null>"
+            rawName ? rawName : "<null>",
+            reinterpret_cast<void*>(caller)
         );
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         debugLog(
-            "[CustomAnimationCore] Gob::PlayAnimation request #%ld gob=%p name=<invalid:%p>\n",
+            "[CustomAnimationCore] Gob::PlayAnimation ENTRY_DONE #%ld gob=%p raw_name=<invalid:%p>\n",
             requestLog,
             gob,
             animNameSlot
         );
     }
+}
+
+extern "C" const char* __cdecl ResolvePlayAnimationNameRegisterOverride(const char* rawName, void* gob) {
+    static LONG registerLogCount = 0;
+    const LONG registerLog = InterlockedIncrement(&registerLogCount);
+    const char* safeName = SafeReadCString(rawName);
+    const char* overrideName = CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(safeName);
+    if (!overrideName) {
+        if (registerLog <= 200 || IsInterestingAnimationName(safeName)) {
+            debugLog(
+                "[CustomAnimationCore] Gob::PlayAnimation REGISTER_KEEP #%ld gob=%p name=%s\n",
+                registerLog,
+                gob,
+                safeName ? safeName : "<null>"
+            );
+        }
+        return rawName;
+    }
+
+    void* localModel = SafeReadPointer(gob, 0x58);
+    void* addInModel = SafeReadPointer(gob, 0x64);
+    void* localAnimation = FindAnimationInModelChain(localModel, overrideName);
+    void* addInAnimation = localAnimation ? nullptr : FindAnimationInModelChain(addInModel, overrideName);
+    void* resolvedAnimation = localAnimation ? localAnimation : addInAnimation;
+    const char* localModelName = SafeReadAnimationName(localModel);
+    const char* addInModelName = SafeReadAnimationName(addInModel);
+    if (!resolvedAnimation) {
+        debugLog(
+            "[CustomAnimationCore] Gob::PlayAnimation REGISTER_UNAVAILABLE #%ld gob=%p original=%s requested=%s local_model=%s addin_model=%s; keeping original\n",
+            registerLog,
+            gob,
+            safeName ? safeName : "<null>",
+            overrideName,
+            localModelName ? localModelName : "<null>",
+            addInModelName ? addInModelName : "<null>"
+        );
+        return rawName;
+    }
+
+    debugLog(
+        "[CustomAnimationCore] Gob::PlayAnimation REGISTER_MAPPED #%ld gob=%p original=%s resolved=%s source=%s animation=%p local_model=%s addin_model=%s\n",
+        registerLog,
+        gob,
+        safeName ? safeName : "<null>",
+        overrideName,
+        localAnimation ? "local" : "addin",
+        resolvedAnimation,
+        localModelName ? localModelName : "<null>",
+        addInModelName ? addInModelName : "<null>"
+    );
+    return overrideName;
+}
+
+extern "C" __declspec(naked) void __cdecl OverridePlayAnimationNameRegister() {
+    __asm {
+        push dword ptr [esp + 8]
+        push dword ptr [esp + 8]
+        call ResolvePlayAnimationNameRegisterOverride
+        add esp, 8
+
+        // KPM's wrapper keeps the saved game registers behind EBX. EBX is the
+        // live animation-name register at this hook site, so patch the saved
+        // EBX slot before restoring CPU state.
+        mov dword ptr [ebx + 20], eax
+        mov edx, ebx
+        mov esp, edx
+        popfd
+        popad
+
+        push ebx
+        push 0x0073ee04
+        mov eax, 0x00485bfc
+        jmp eax
+    }
+}
+
+extern "C" void __cdecl LogAnimationExistsRequest(void* animBase, uint32_t* animationIdSlot) {
+    static LONG requestLogCount = 0;
+    const LONG requestLog = InterlockedIncrement(&requestLogCount);
+
+    uint16_t requestedId = InvalidAnimationId;
+    __try {
+        requestedId = animationIdSlot ? static_cast<uint16_t>(*animationIdSlot & 0xffff) : InvalidAnimationId;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        requestedId = InvalidAnimationId;
+    }
+
+    uint16_t resolvedId = requestedId;
+    const char* registeredName = ResolveRegisteredNameForId(requestedId, &resolvedId);
+    if (requestLog <= 200 || IsInterestingAnimationName(registeredName)) {
+        if (registeredName && resolvedId != requestedId) {
+            debugLog(
+                "[CustomAnimationCore] AnimationExists ENTRY #%ld animBase=%p id=%u mapped=%u name=%s\n",
+                requestLog,
+                animBase,
+                requestedId,
+                resolvedId,
+                registeredName
+            );
+        }
+        else {
+            debugLog(
+                "[CustomAnimationCore] AnimationExists ENTRY #%ld animBase=%p id=%u name=%s\n",
+                requestLog,
+                animBase,
+                requestedId,
+                registeredName ? registeredName : "<vanilla-or-unresolved>"
+            );
+        }
+    }
+}
+
+extern "C" void __cdecl LogAnimationExistsLookup(void* target, const char* animName) {
+    static LONG lookupLogCount = 0;
+    const LONG lookupLog = InterlockedIncrement(&lookupLogCount);
+    const char* safeName = SafeReadCString(animName);
+    const bool interesting = IsInterestingAnimationName(safeName);
+
+    if (lookupLog <= 200 || interesting) {
+        debugLog(
+            "[CustomAnimationCore] AnimationExists LOOKUP #%ld target=%p name=%s\n",
+            lookupLog,
+            target,
+            safeName ? safeName : "<null>"
+        );
+    }
+
+    lastAnimationExistsProbe.sequence = lookupLog;
+    lastAnimationExistsProbe.target = target;
+    CopyProbeName(lastAnimationExistsProbe.name, safeName);
+}
+
+void LogAnimationExistsResult(const char* resultText, int resultValue) {
+    if (lastAnimationExistsProbe.sequence <= 0 && resultValue == 0) {
+        return;
+    }
+
+    if (lastAnimationExistsProbe.sequence <= 200 || IsInterestingAnimationName(lastAnimationExistsProbe.name)) {
+        debugLog(
+            "[CustomAnimationCore] AnimationExists RESULT #%ld target=%p name=%s result=%s\n",
+            lastAnimationExistsProbe.sequence,
+            lastAnimationExistsProbe.target,
+            lastAnimationExistsProbe.name[0] ? lastAnimationExistsProbe.name : "<unknown>",
+            resultText
+        );
+    }
+}
+
+extern "C" void __cdecl LogAnimationExistsResultTrue() {
+    LogAnimationExistsResult("TRUE", 1);
+}
+
+extern "C" void __cdecl LogAnimationExistsResultFalse() {
+    LogAnimationExistsResult("FALSE", 0);
+}
+
+extern "C" void __cdecl LogAnimRunConstruct(void* animRun, uint32_t* animationSlot) {
+    static LONG constructLogCount = 0;
+    const LONG constructLog = InterlockedIncrement(&constructLogCount);
+
+    void* animation = nullptr;
+    __try {
+        animation = animationSlot ? reinterpret_cast<void*>(*animationSlot) : nullptr;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        animation = nullptr;
+    }
+
+    const char* animName = SafeReadAnimationName(animation);
+    const float duration = SafeReadFloat(animation, 0x50);
+
+    if (constructLog <= 200 || IsInterestingAnimationName(animName)) {
+        debugLog(
+            "[CustomAnimationCore] AnimRun CREATE #%ld run=%p animation=%p name=%s duration=%.3f\n",
+            constructLog,
+            animRun,
+            animation,
+            animName ? animName : "<unknown>",
+            duration
+        );
+    }
+}
+
+bool ShouldLogFindAnimationProbe(LONG sequence, const char* animName) {
+    return sequence <= 500
+        || IsInterestingAnimationName(animName)
+        || CustomAnimationRegistry::Instance().LookupPlayAnimationNameOverride(animName) != nullptr;
+}
+
+extern "C" void __cdecl LogFindAnimationSearch(void* model, const char* animName) {
+    static LONG searchLogCount = 0;
+    const LONG searchLog = InterlockedIncrement(&searchLogCount);
+    const char* safeName = SafeReadCString(animName);
+    if (!ShouldLogFindAnimationProbe(searchLog, safeName)) {
+        return;
+    }
+
+    const char* modelName = SafeReadAnimationName(model);
+    const int32_t localAnimCount = SafeReadInt32(model, 0x5c);
+    void* localAnimArray = SafeReadPointer(model, 0x58);
+    void* superModel = SafeReadPointer(model, 0x64);
+
+    debugLog(
+        "[CustomAnimationCore] FindAnimation SEARCH #%ld model=%p model_name=%s name=%s local_count=%d local_array=%p super=%p\n",
+        searchLog,
+        model,
+        modelName ? modelName : "<unknown>",
+        safeName ? safeName : "<null>",
+        localAnimCount,
+        localAnimArray,
+        superModel
+    );
+}
+
+void LogGobFindAnimationResult(
+    const char* context,
+    void* gob,
+    const char* animName,
+    void* result,
+    size_t modelOffset
+) {
+    static LONG resultLogCount = 0;
+    const LONG resultLog = InterlockedIncrement(&resultLogCount);
+    const char* safeName = SafeReadCString(animName);
+    if (!ShouldLogFindAnimationProbe(resultLog, safeName)) {
+        return;
+    }
+
+    void* model = SafeReadPointer(gob, modelOffset);
+    const char* modelName = SafeReadAnimationName(model);
+    const char* resultName = SafeReadAnimationName(result);
+    const float resultDuration = SafeReadFloat(result, 0x50);
+
+    debugLog(
+        "[CustomAnimationCore] FindAnimation %s RESULT #%ld gob=%p model=%p model_name=%s query=%s result=%p result_name=%s duration=%.3f\n",
+        context,
+        resultLog,
+        gob,
+        model,
+        modelName ? modelName : "<unknown>",
+        safeName ? safeName : "<null>",
+        result,
+        resultName ? resultName : "<null>",
+        resultDuration
+    );
+}
+
+extern "C" void __cdecl LogGobFindAnimationAddInResult(void* gob, const char* animName, void* result) {
+    LogGobFindAnimationResult("ADDIN", gob, animName, result, 0x64);
+}
+
+extern "C" void __cdecl LogGobFindAnimationLocalResult(void* gob, const char* animName, void* result) {
+    LogGobFindAnimationResult("LOCAL", gob, animName, result, 0x58);
 }
 
 void LogAnimationPlayCall(const char* context, void* target, const char* animName) {

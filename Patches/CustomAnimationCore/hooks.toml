@@ -61,6 +61,56 @@ original_bytes = [0x64, 0xa1, 0x00, 0x00, 0x00, 0x00]
 source = "esp+8"
 type = "pointer" # CSWCAnimBaseTW::SetAnimationInternal animation-id stack slot.
 
+# CSWCAnimBase::AnimationExists entry.
+#
+# Ghidra shows this function takes an animation ID, resolves it through
+# GetAnimationName, then asks the target animation object whether that resolved
+# name has a positive duration. This entry hook records the raw ID before the
+# vanilla name resolution runs.
+[[hooks]]
+address = 0x0069d910
+type = "detour"
+function = "LogAnimationExistsRequest"
+original_bytes = [0x6a, 0xff, 0x68, 0x70, 0x0c, 0x73, 0x00]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # CSWCAnimBase* this pointer.
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # Animation-id stack slot.
+
+# CSWCAnimBase::AnimationExists target lookup.
+#
+# At this point EAX is CExoString::CStr(resolved_name) and ECX is the target
+# animation object at [this+0xb8]. Logging here confirms whether kpmwin1 reaches
+# the engine's existence query before the virtual length check runs.
+[[hooks]]
+address = 0x0069d9b5
+type = "detour"
+function = "LogAnimationExistsLookup"
+original_bytes = [0x50, 0xff, 0x57, 0x1c, 0xd9, 0x44, 0x24, 0x08]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # Target animation object.
+
+[[hooks.parameters]]
+source = "eax"
+type = "pointer" # Resolved animation name C string.
+
+# CSWCAnimBase::AnimationExists success and failure result assignments.
+[[hooks]]
+address = 0x0069d9cb
+type = "detour"
+function = "LogAnimationExistsResultTrue"
+original_bytes = [0xbe, 0x01, 0x00, 0x00, 0x00]
+
+# Disabled: 0x0069d9d2 is immediately before the shared continuation at
+# 0x0069d9d4. A five-byte detour here overlaps that continuation and can crash
+# the success path. Keep false-result inference from the absence of TRUE logs.
+
 # Gob::PlayAnimation entry.
 #
 # Temporary runtime telemetry for Issue #98. The engine ultimately plays by
@@ -79,6 +129,86 @@ type = "pointer" # Gob* this pointer.
 [[hooks.parameters]]
 source = "esp+4"
 type = "pointer" # Address of the stack slot containing char* animation name.
+
+# Gob::PlayAnimation after EBX receives the raw animation-name pointer.
+#
+# The entry hook above can log the requested stack name, but KPM passes a copy
+# of stack parameters to C detours, so mutating that pointer does not affect the
+# original function. This non-returning hook patches the saved EBX register in
+# the wrapper state, restores CPU state, then replays the stolen PUSH/PUSH bytes
+# and jumps to the original strcmp call at 0x00485bfc.
+[[hooks]]
+address = 0x00485bf6
+type = "detour"
+function = "OverridePlayAnimationNameRegister"
+original_bytes = [0x53, 0x68, 0x04, 0xee, 0x73, 0x00]
+exclude_from_restore = ["ebx"]
+skip_original_bytes = true
+
+[[hooks.parameters]]
+source = "ebx"
+type = "pointer" # Raw animation-name C string.
+
+[[hooks.parameters]]
+source = "esi"
+type = "pointer" # Gob* this pointer.
+
+# AnimRun::AnimRun(Animation*) constructor.
+#
+# Gob::PlayAnimation calls this constructor only after it has found an
+# Animation descriptor by name. If kpmwin1 appears here with a non-zero
+# duration, lookup and run construction have both passed.
+[[hooks]]
+address = 0x00481890
+type = "detour"
+function = "LogAnimRunConstruct"
+original_bytes = [0x8b, 0xc1, 0x8b, 0x4c, 0x24, 0x04]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # AnimRun* being initialized.
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # Stack slot containing Animation*.
+
+# Gob::PlayAnimation result from the add-in/supermodel search at [Gob+0x64].
+[[hooks]]
+address = 0x00485d58
+type = "detour"
+function = "LogGobFindAnimationAddInResult"
+original_bytes = [0x8b, 0xe8, 0x8b, 0x46, 0x64]
+
+[[hooks.parameters]]
+source = "esi"
+type = "pointer" # Gob* this pointer.
+
+[[hooks.parameters]]
+source = "ebx"
+type = "pointer" # char* animation name query.
+
+[[hooks.parameters]]
+source = "eax"
+type = "pointer" # Animation* result from FindAnimation.
+
+# Gob::PlayAnimation result from the local model search at [Gob+0x58].
+[[hooks]]
+address = 0x00485d72
+type = "detour"
+function = "LogGobFindAnimationLocalResult"
+original_bytes = [0x8b, 0x56, 0x58, 0x83, 0xc4, 0x08]
+
+[[hooks.parameters]]
+source = "esi"
+type = "pointer" # Gob* this pointer.
+
+[[hooks.parameters]]
+source = "ebx"
+type = "pointer" # char* animation name query.
+
+[[hooks.parameters]]
+source = "eax"
+type = "pointer" # Animation* result from FindAnimation.
 
 # CSWCAnimBase::SetAnimationInternal call into the target object's
 # PlayAnimation virtual. EAX has CExoString::CStr(localName), EBX has target.

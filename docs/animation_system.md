@@ -188,6 +188,34 @@ retarget/export path is writing mostly rest-pose controller values. The next
 asset-side fix should validate source-vs-export motion amplitude per mapped
 bone before installing the MDL.
 
+### Direct Name Lookup Diagnostic
+
+The next diagnostic pass bypasses custom animation IDs entirely and maps direct
+`Gob::PlayAnimation` name requests (`default`, `pause1`) to the local test name
+`kpmwin1`. A plain C detour at `Gob::PlayAnimation` entry can log the incoming
+stack string but cannot safely rewrite the live argument because KPM passes
+stack parameters into detour callbacks as wrapper copies.
+
+The working probe hooks `Gob::PlayAnimation` after `EBX` receives the animation
+name at `0x00485bf6`. The naked hook updates KPM's saved `EBX` register slot,
+restores CPU state, replays the stolen `push ebx; push 0x0073ee04` bytes, and
+jumps back to the original string-check call at `0x00485bfc`.
+
+Runtime findings:
+
+- the register hook can change the real lookup query from `default` to
+  `kpmwin1`;
+- `FindAnimation` returns a fallback `default` animation when the current model
+  does not contain the requested name, as seen on the `mainmenu` model;
+- the current smoke hook now checks the Gob local/add-in model chain before
+  mapping, logging `REGISTER_UNAVAILABLE` and keeping vanilla if the requested
+  custom animation is absent;
+- a PMBAM save-load pass should now produce either
+  `REGISTER_MAPPED ... local_model=PMBAM ... resolved=kpmwin1`, proving engine
+  lookup and `AnimRun` construction reach the custom animation, or
+  `REGISTER_UNAVAILABLE ... local_model=PMBAM`, proving the live model chain
+  does not expose the local animation despite offline MDL readback.
+
 ### Tier 5: Demo Patch
 
 Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.

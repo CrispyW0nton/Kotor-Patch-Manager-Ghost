@@ -14,6 +14,15 @@ EXPORTS
     OverrideSetAnimationId
     OverrideSetAnimationInternalId
     LogPlayAnimationRequest
+    ResolvePlayAnimationNameRegisterOverride
+    OverridePlayAnimationNameRegister
+    LogAnimationExistsRequest
+    LogAnimationExistsLookup
+    LogAnimationExistsResultTrue
+    LogAnimationExistsResultFalse
+    LogAnimRunConstruct
+    LogGobFindAnimationAddInResult
+    LogGobFindAnimationLocalResult
     LogBaseAnimationPlayCall
     LogTWPrimaryAnimationPlayCall
     LogTWSecondaryAnimationPlayCall
