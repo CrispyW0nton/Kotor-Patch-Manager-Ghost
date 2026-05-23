@@ -3,10 +3,12 @@
 #include "GameAPI/GameVersion.h"
 #include "Registry.h"
 
+#include <cstring>
+
 namespace {
 constexpr uint16_t InvalidAnimationId = 0xffff;
 
-using CExoStringAssignFn = void*(__thiscall*)(void* thisPtr, void* other);
+using CExoStringAssignFn = void*(__thiscall*)(void* thisPtr, char* value);
 CExoStringAssignFn cExoStringAssign = nullptr;
 
 uint8_t LowByteOrZero(const uint32_t* value) {
@@ -45,9 +47,25 @@ bool AssignCExoString(void* outputString, const char* value) {
         return false;
     }
 
-    CExoString source(const_cast<char*>(value));
-    cExoStringAssign(outputString, source.GetPtr());
+    cExoStringAssign(outputString, const_cast<char*>(value));
     return true;
+}
+
+bool IsInterestingAnimationName(const char* name) {
+    if (!name) {
+        return false;
+    }
+
+    __try {
+        return std::strstr(name, "dance")
+            || std::strstr(name, "victory")
+            || std::strstr(name, "pause")
+            || std::strstr(name, "walk")
+            || std::strstr(name, "run");
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
 }
 
 uint32_t ResolveAnimationOverride(
@@ -224,6 +242,80 @@ extern "C" void __cdecl OverrideSetAnimationInternalId(uint32_t* animationIdSlot
     ResolveSetAnimationIdOverride("SetAnimationInternal", animationIdSlot);
 }
 
+extern "C" void __cdecl LogPlayAnimationRequest(void* gob, const char** animNameSlot) {
+    static LONG requestLogCount = 0;
+    const LONG requestLog = InterlockedIncrement(&requestLogCount);
+
+    const char* animName = nullptr;
+    __try {
+        animName = animNameSlot ? *animNameSlot : nullptr;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        animName = nullptr;
+    }
+
+    if (requestLog > 120 && !IsInterestingAnimationName(animName)) {
+        return;
+    }
+
+    __try {
+        debugLog(
+            "[CustomAnimationCore] Gob::PlayAnimation request #%ld gob=%p name=%s\n",
+            requestLog,
+            gob,
+            animName ? animName : "<null>"
+        );
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        debugLog(
+            "[CustomAnimationCore] Gob::PlayAnimation request #%ld gob=%p name=<invalid:%p>\n",
+            requestLog,
+            gob,
+            animNameSlot
+        );
+    }
+}
+
+void LogAnimationPlayCall(const char* context, void* target, const char* animName) {
+    static LONG playCallLogCount = 0;
+    const LONG requestLog = InterlockedIncrement(&playCallLogCount);
+
+    if (requestLog > 200 && !IsInterestingAnimationName(animName)) {
+        return;
+    }
+
+    __try {
+        debugLog(
+            "[CustomAnimationCore] %s PlayAnimation call #%ld target=%p name=%s\n",
+            context,
+            requestLog,
+            target,
+            animName ? animName : "<null>"
+        );
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        debugLog(
+            "[CustomAnimationCore] %s PlayAnimation call #%ld target=%p name=<invalid:%p>\n",
+            context,
+            requestLog,
+            target,
+            animName
+        );
+    }
+}
+
+extern "C" void __cdecl LogBaseAnimationPlayCall(void* target, const char* animName) {
+    LogAnimationPlayCall("Base", target, animName);
+}
+
+extern "C" void __cdecl LogTWPrimaryAnimationPlayCall(void* target, const char* animName) {
+    LogAnimationPlayCall("TWPrimary", target, animName);
+}
+
+extern "C" void __cdecl LogTWSecondaryAnimationPlayCall(void* target, const char* animName) {
+    LogAnimationPlayCall("TWSecondary", target, animName);
+}
+
 extern "C" __declspec(naked) void __cdecl OverrideMeleeDefaultAnimationId() {
     __asm {
         push dword ptr [esp + 12]
@@ -274,15 +366,19 @@ extern "C" __declspec(naked) void __cdecl OverrideRangedDefaultAnimationId() {
 
 extern "C" __declspec(naked) void __cdecl OverrideAnimationNameLookup() {
     __asm {
-        test eax, eax
-        jnz CustomAnimationNameSuccess
-
+        // Check the registry before honoring the vanilla animations.2da result.
+        // This lets a smoke test keep a vanilla row's timing/metadata while
+        // swapping only the model animation name that row resolves to.
         mov ecx, dword ptr [ebx + 16]
         lea ecx, [ecx + 0x18]
         push ecx
         push edi
         call ResolveCustomAnimationNameFromId
         add esp, 8
+        test eax, eax
+        jnz CustomAnimationNameSuccess
+
+        mov eax, dword ptr [ebx + 32]
         test eax, eax
         jnz CustomAnimationNameSuccess
 

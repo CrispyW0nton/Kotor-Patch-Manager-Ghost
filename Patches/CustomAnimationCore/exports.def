@@ -12,6 +12,10 @@ EXPORTS
     ClearCustomAnimationRegistry
     OverrideSetAnimationId
     OverrideSetAnimationInternalId
+    LogPlayAnimationRequest
+    LogBaseAnimationPlayCall
+    LogTWPrimaryAnimationPlayCall
+    LogTWSecondaryAnimationPlayCall
     OverrideMeleeDefaultAnimationId
     OverrideRangedDefaultAnimationId
     OverrideAnimationNameLookup

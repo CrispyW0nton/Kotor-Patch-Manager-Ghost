@@ -6,11 +6,12 @@
 namespace {
 constexpr uint8_t WildcardKey = 0xff;
 constexpr uint8_t ResolverFamilyAny = 0;
-constexpr uint16_t SmokeAnimationId = 65000;
-constexpr const char* SmokeAnimationName = "victory";
+constexpr uint16_t SmokeAnimationId = 10000;
+constexpr const char* SmokeAnimationName = "dance";
 
 using RegisterAnimationWithIdFn = bool(__cdecl*)(const char*, uint16_t);
 using MapResolverAnimationFn = bool(__cdecl*)(uint8_t, uint8_t, uint8_t, const char*);
+using MapAnimationIdOverrideFn = bool(__cdecl*)(uint16_t, uint16_t);
 using LookupAnimationIdFn = uint16_t(__cdecl*)(const char*);
 using LookupAnimationNameByIdFn = const char*(__cdecl*)(uint16_t);
 
@@ -28,10 +29,11 @@ bool InstallSmokeMapping() {
 
     auto registerAnimationWithId = ResolveExport<RegisterAnimationWithIdFn>(core, "RegisterAnimationWithId");
     auto mapResolverAnimation = ResolveExport<MapResolverAnimationFn>(core, "MapResolverAnimation");
+    auto mapAnimationIdOverride = ResolveExport<MapAnimationIdOverrideFn>(core, "MapAnimationIdOverride");
     auto lookupAnimationId = ResolveExport<LookupAnimationIdFn>(core, "LookupAnimationId");
     auto lookupAnimationNameById = ResolveExport<LookupAnimationNameByIdFn>(core, "LookupAnimationNameById");
 
-    if (!registerAnimationWithId || !mapResolverAnimation || !lookupAnimationId || !lookupAnimationNameById) {
+    if (!registerAnimationWithId || !mapResolverAnimation || !mapAnimationIdOverride || !lookupAnimationId || !lookupAnimationNameById) {
         debugLog("[CustomAnimationSmokeTest] ERROR: required CustomAnimationCore export is missing\n");
         return false;
     }
@@ -72,10 +74,24 @@ bool InstallSmokeMapping() {
         return false;
     }
 
+    if (!mapAnimationIdOverride(SmokeAnimationId, SmokeAnimationId)) {
+        debugLog(
+            "[CustomAnimationSmokeTest] ERROR: failed to install in-range proof mapping %u -> %u\n",
+            SmokeAnimationId,
+            SmokeAnimationId
+        );
+        return false;
+    }
+
     debugLog(
-        "[CustomAnimationSmokeTest] Registered wildcard resolver mapping only -> %s / id %u\n",
-        SmokeAnimationName,
-        SmokeAnimationId
+        "[CustomAnimationSmokeTest] Registered vanilla-row name proof mapping -> id %u resolves to %s\n",
+        SmokeAnimationId,
+        SmokeAnimationName
+    );
+    debugLog(
+        "[CustomAnimationSmokeTest] Loaded-save idle requests for animation %u should resolve to %s\n",
+        SmokeAnimationId,
+        SmokeAnimationName
     );
     return true;
 }

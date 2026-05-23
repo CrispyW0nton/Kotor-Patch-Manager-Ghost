@@ -61,6 +61,71 @@ original_bytes = [0x64, 0xa1, 0x00, 0x00, 0x00, 0x00]
 source = "esp+8"
 type = "pointer" # CSWCAnimBaseTW::SetAnimationInternal animation-id stack slot.
 
+# Gob::PlayAnimation entry.
+#
+# Temporary runtime telemetry for Issue #98. The engine ultimately plays by
+# name, so this hook confirms which string reaches the model/supermodel lookup
+# after GetAnimationName and the CSWCAnimBase dispatch layers finish.
+[[hooks]]
+address = 0x00485bd0
+type = "detour"
+function = "LogPlayAnimationRequest"
+original_bytes = [0x81, 0xec, 0x48, 0x01, 0x00, 0x00]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # Gob* this pointer.
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # Address of the stack slot containing char* animation name.
+
+# CSWCAnimBase::SetAnimationInternal call into the target object's
+# PlayAnimation virtual. EAX has CExoString::CStr(localName), EBX has target.
+[[hooks]]
+address = 0x0069e9a1
+type = "detour"
+function = "LogBaseAnimationPlayCall"
+original_bytes = [0x8b, 0xcb, 0x50, 0xff, 0x56, 0x18]
+
+[[hooks.parameters]]
+source = "ebx"
+type = "pointer" # CAurObject/Gob target.
+
+[[hooks.parameters]]
+source = "eax"
+type = "pointer" # char* animation name.
+
+# CSWCAnimBaseTW::SetAnimationInternal primary body-subobject PlayAnimation.
+[[hooks]]
+address = 0x0069c9d2
+type = "detour"
+function = "LogTWPrimaryAnimationPlayCall"
+original_bytes = [0x50, 0xff, 0x55, 0x18, 0x85, 0xc0]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # CAurObject/Gob target.
+
+[[hooks.parameters]]
+source = "eax"
+type = "pointer" # char* animation name.
+
+# CSWCAnimBaseTW::SetAnimationInternal secondary body-subobject PlayAnimation.
+[[hooks]]
+address = 0x0069ca13
+type = "detour"
+function = "LogTWSecondaryAnimationPlayCall"
+original_bytes = [0x50, 0xff, 0x55, 0x18, 0x85, 0xc0]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # CAurObject/Gob target.
+
+[[hooks.parameters]]
+source = "eax"
+type = "pointer" # char* animation name.
+
 # These first hooks target the shared fallback epilogues in the client-side
 # attack animation ID resolvers. They let vanilla compute an animation ID, then
 # allow CustomAnimationCore to swap ESI and emulate the original function
