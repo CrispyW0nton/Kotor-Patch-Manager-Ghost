@@ -142,10 +142,6 @@ bool CustomAnimationRegistry::MapPlayAnimationNameOverride(const char* fromName,
     }
 
     std::lock_guard<std::mutex> lock(registryMutex);
-    if (nameToId.find(toName) == nameToId.end()) {
-        return false;
-    }
-
     playAnimationNameOverrides[fromName] = toName;
     return true;
 }
@@ -160,10 +156,6 @@ bool CustomAnimationRegistry::MapPlayAnimationNameOverrideForModel(
     }
 
     std::lock_guard<std::mutex> lock(registryMutex);
-    if (nameToId.find(toName) == nameToId.end()) {
-        return false;
-    }
-
     playAnimationNameOverridesByModel[BuildModelPlayOverrideKey(modelName, fromName)] = toName;
     return true;
 }

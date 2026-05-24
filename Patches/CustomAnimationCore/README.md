@@ -24,6 +24,8 @@ Registry rules for the v0 prototype:
 - Registering a different name with an already-used ID fails.
 - `MapResolverAnimation` only accepts names that are already registered.
 - `MapAnimationIdOverride` only accepts target IDs that are already registered.
+- Direct play-name overrides may target any animation name. The model/supermodel
+  chain is allowed to prove whether that name exists at runtime.
 - `MapWeaponAction` is retained as a compatibility wrapper for family `0`
   mappings.
 

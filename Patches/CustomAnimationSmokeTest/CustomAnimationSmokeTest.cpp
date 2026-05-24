@@ -9,6 +9,7 @@ constexpr uint8_t ResolverFamilyAny = 0;
 constexpr uint16_t SmokeAnimationId = 10000;
 constexpr uint16_t InvalidAnimationId = 0xffff;
 constexpr const char* SmokeAnimationName = "kpmwin1";
+constexpr const char* SmokePlaybackName = SmokeAnimationName;
 constexpr bool EnableWildcardResolverProof = false;
 constexpr const char* SmokePlayNameOverrides[] = {
     "default",
@@ -119,12 +120,12 @@ bool InstallSmokeMapping() {
 
     for (const char* fromName : SmokePlayNameOverrides) {
         for (const char* modelName : SmokeTargetModels) {
-            if (!mapPlayAnimationNameOverrideForModel(modelName, fromName, SmokeAnimationName)) {
+            if (!mapPlayAnimationNameOverrideForModel(modelName, fromName, SmokePlaybackName)) {
                 debugLog(
                     "[CustomAnimationSmokeTest] ERROR: failed to install direct play-name proof mapping %s:%s -> %s\n",
                     modelName,
                     fromName,
-                    SmokeAnimationName
+                    SmokePlaybackName
                 );
                 return false;
             }
@@ -132,7 +133,7 @@ bool InstallSmokeMapping() {
                 "[CustomAnimationSmokeTest] Direct play-name proof mapping %s:%s -> %s\n",
                 modelName,
                 fromName,
-                SmokeAnimationName
+                SmokePlaybackName
             );
         }
     }
@@ -144,7 +145,7 @@ bool InstallSmokeMapping() {
     );
     debugLog(
         "[CustomAnimationSmokeTest] Direct Gob::PlayAnimation requests should resolve to %s\n",
-        SmokeAnimationName
+        SmokePlaybackName
     );
     return true;
 }
