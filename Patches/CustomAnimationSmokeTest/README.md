@@ -40,6 +40,42 @@ mapping stays scoped to the model names under test.
 
 The first model-scoped live load pass reached gameplay without crashing. The
 player body was `PMBAL`; `walk` stayed vanilla, and `pause1` logged
-`REGISTER_UNAVAILABLE` because `PMBAL` still does not expose local animation
-`kpmwin1`. That is the expected safe fallback until GhostRigger produces a true
-PMBAL animation-only injection.
+`REGISTER_UNAVAILABLE` because `PMBAL` still did not expose local animation
+`kpmwin1`. That confirmed the runtime patch was behaving safely while the asset
+route was still wrong.
+
+## Custom Supermodel Probe
+
+The current probe uses a separate test supermodel instead of injecting the
+custom animation directly into PMBAM/PMBAL:
+
+```text
+PMBAM -> S_KPMF02 -> S_Female01
+PMBAL -> S_KPMF02 -> S_Female01
+```
+
+`S_KPMF02` is a byte-preserved duplicate of vanilla `S_Female02` with one
+additional local animation, `kpmwin1`, appended by GhostRigger's R3.B writer.
+The PMBAM/PMBAL overrides are header-only edits that change the 32-byte
+supermodel field from `S_Female02` to `S_KPMF02`; their MDX files remain vanilla
+copies.
+
+Build/rebuild the probe assets with:
+
+```powershell
+python tools\build_custom_supermodel_probe.py
+```
+
+Generated probe files live in `additional/`:
+
+- `s_kpmf02.mdl/.mdx`
+- `pmbam.mdl/.mdx`
+- `pmbal.mdl/.mdx`
+- `custom_supermodel_probe_manifest.json`
+
+Live-test expectation: with `CustomAnimationCore` and this smoke test enabled,
+the first PMBAM/PMBAL `default` or `pause1` request should map to `kpmwin1`,
+`FindAnimation ADDIN RESULT` should report a non-null result from `S_KPMF02`,
+and `AnimRun CREATE` should show `name=kpmwin1`. If that still A-poses, the
+remaining bug is inside the exported animation block/controller semantics, not
+the registry or the local-body routing.

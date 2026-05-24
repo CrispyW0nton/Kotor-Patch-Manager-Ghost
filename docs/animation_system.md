@@ -253,6 +253,40 @@ narrows the remaining proof blocker to asset routing/export only: GhostRigger
 must inject local animation `kpmwin1` into the actual vanilla `PMBAL` model used
 by the save, preserving `PMBAL` geometry/MDX byte-for-byte.
 
+### Custom Supermodel Probe
+
+The next diagnostic asset route avoids local body-animation injection entirely.
+Instead, it inserts a duplicate supermodel into the inheritance chain:
+
+```text
+PMBAM -> S_KPMF02 -> S_Female01
+PMBAL -> S_KPMF02 -> S_Female01
+```
+
+`S_KPMF02` is generated from vanilla `S_Female02` with a single appended custom
+local animation named `kpmwin1`. PMBAM and PMBAL are not rebuilt; their override
+MDLs only patch the 32-byte supermodel string from `S_Female02` to `S_KPMF02`,
+and their MDX files remain vanilla copies. The generated probe is kept under
+`Patches/CustomAnimationSmokeTest/additional/`, with a reproducible builder at
+`tools/build_custom_supermodel_probe.py`.
+
+Offline readback for the generated files:
+
+- `s_kpmf02.mdl`: 83 nodes, 63 mesh nodes, supermodel `S_Female01`, local
+  animation list includes `kpmwin1`;
+- `pmbam.mdl`: 61 nodes, no local animations, supermodel `S_KPMF02`;
+- `pmbal.mdl`: 62 nodes, no local animations, supermodel `S_KPMF02`.
+
+This test should distinguish two remaining possibilities:
+
+- If `FindAnimation ADDIN RESULT` returns `kpmwin1` from `S_KPMF02` and the
+  character animates, inherited custom animation playback is proven and the
+  body-local injection path is the broken GhostRigger export target.
+- If the result is non-null but the character A-poses, the exported
+  `kpmwin1` controller data is still incompatible with the engine runtime.
+- If the result is null, the supermodel chain or loader resource naming is
+  wrong.
+
 ### Tier 5: Demo Patch
 
 Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.
