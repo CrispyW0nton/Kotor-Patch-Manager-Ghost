@@ -1,0 +1,43 @@
+# Issue #98 KOTOR 2 Steam direct-name prototype hooks.
+#
+# This first K2 phase deliberately intercepts only Gob::PlayAnimation and the
+# AnimRun constructor. The name override is model-scoped and is applied only
+# after the requested custom animation is found in the local/add-in model chain.
+
+target_versions = [
+    "6A522E71631DCEE93467BD2010F3B23D9145326E1E2E89305F13AB104DBBFFEF",
+    "4AB72FC1AB082F427E008CDA32FC5602D27B4E12FEF48C4A1A2C6F7B2F36FB5A",
+]
+
+# Gob::PlayAnimation(char*, float, uint, float) at 0x004E3270.
+# The detour receives a pointer to the real caller stack slot and can replace
+# the name before the original prologue reads [EBP+8].
+[[hooks]]
+address = 0x004e3270
+type = "detour"
+function = "OverridePlayAnimationRequest"
+original_bytes = [0x55, 0x8b, 0xec, 0x6a, 0xff]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # Gob* this pointer.
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # Address of the char* animation-name stack slot.
+
+# AnimRun::AnimRun(Animation*) at 0x004DCDD0. This confirms that K2 accepted
+# the mapped name and constructed a run from the resulting descriptor.
+[[hooks]]
+address = 0x004dcdd0
+type = "detour"
+function = "LogAnimRunConstruct"
+original_bytes = [0x55, 0x8b, 0xec, 0x51, 0x89, 0x4d, 0xfc]
+
+[[hooks.parameters]]
+source = "ecx"
+type = "pointer" # AnimRun* being initialized.
+
+[[hooks.parameters]]
+source = "esp+4"
+type = "pointer" # Address of the Animation* stack slot.

@@ -287,6 +287,55 @@ This test should distinguish two remaining possibilities:
 - If the result is null, the supermodel chain or loader resource naming is
   wrong.
 
+### K2 Direct-Name Port and Drexl Probe (2026-07-11)
+
+The K2 prototype no longer depends on guessing K1-compatible object layouts.
+Ghidra analysis of the exact K2 Steam executable established:
+
+- `Model::FindAnimation` at `0x004DCF50`;
+- `AnimRun::Constructor` at `0x004DCDD0`;
+- `Gob::PlayAnimation` at `0x004E3270`;
+- Gob local model pointer at `+0x84` and add-in model pointer at `+0x90`;
+- Model animation array/count at `+0x58`/`+0x5C`, supermodel at `+0x64`, and
+  animation name at `+0x08`.
+
+`CustomAnimationCore` now detours K2 `Gob::PlayAnimation` at entry. It receives
+the address of the real animation-name stack slot, resolves a model-scoped
+mapping, verifies that the custom animation exists in the local/add-in model
+chain, and only then mutates the caller's argument. A second detour logs
+`AnimRun` construction so runtime telemetry can distinguish name mapping from
+successful descriptor consumption.
+
+The first K2 fixture is `CustomAnimationK2DrexlTest`:
+
+- custom name and explicit development ID: `kpm_drx_a1` / `65000`;
+- source clip: `C_Mykal.g0a1`;
+- target model: the effective mod-list `C_DrexlF`;
+- unique spawn template: `kpm98_drx.utc`;
+- test location: `plcaa`;
+- no PLCaa module, shared 2DA, or existing creature template is replaced.
+
+The generated Drexl MDX is byte-identical to the effective mod-list baseline.
+The MDL is rebuilt from that same effective model and adds the local animation
+payload. Live staging backs up every replaced file before copying it.
+
+The active mod list patches `swkotor2.exe`, producing SHA-256
+`4AB72FC1AB082F427E008CDA32FC5602D27B4E12FEF48C4A1A2C6F7B2F36FB5A`.
+It remains compatible with the Steam hooks: image base, entry point, section
+layout, and the complete `FindAnimation`, `AnimRun`, and `PlayAnimation` code
+regions are byte-identical to the original executable. Both fingerprints are
+therefore explicit supported targets rather than using a validation bypass.
+
+The passive KotorDebugger attached successfully to the modded game, recorded
+51 initial modules, captured both hook installations, validated the address
+database fingerprint, and observed all five Drexl name mappings registering.
+It uses the Windows debug API and does not place `dinput8.dll`, `winmm.dll`, or
+another proxy loader in the game directory.
+
+Remaining acceptance gate: spawn `kpm98_drx` in `plcaa` and capture
+`REGISTER_MAPPED`, `STACK_MAPPED`, and `AnimRun CREATE ... name=kpm_drx_a1`
+alongside visible playback.
+
 ### Tier 5: Demo Patch
 
 Use a small downstream patch to prove the contract. The likely demo is a K2 Mira/wrist-launcher animation patch, but K1 may need a temporary demo first because the K2 address databases are still sparse.

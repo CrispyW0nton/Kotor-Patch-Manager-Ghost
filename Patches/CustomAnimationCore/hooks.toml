@@ -6,6 +6,13 @@
 # GetAnimationName, AnimationExists, and combat fallback hooks are left out of
 # this runtime build until the direct name path is stable.
 
+target_versions = [
+    "9C10E0450A6EECA417E036E3CDE7474FED1F0A92AAB018446D156944DEA91435",
+    "34E6D971C034222A417995D8E1E8FDD9F8781795C9C289BD86C499A439F34C88",
+    "304A212F759F19FFD81D4B3C2F8B95FD73FBCB0BCA9E07C1D898D9FF05F9B775",
+    "761F9466F456A83909036BAEBB5C43167D722387BE66E54617BA20A8C49E9886",
+]
+
 # Gob::PlayAnimation entry.
 #
 # Runtime telemetry for the raw animation name and owning local model before

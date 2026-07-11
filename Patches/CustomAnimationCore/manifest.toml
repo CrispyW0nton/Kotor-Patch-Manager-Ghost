@@ -3,7 +3,7 @@ id = "custom-animation-core"
 name = "Custom Animation Core"
 version = "0.1.0"
 author = "CrispyW0nton"
-description = "Experimental registry for exposing custom animation names and gameplay mappings to downstream patches."
+description = "Experimental KOTOR 1 and 2 registry for exposing custom animation names and gameplay mappings to downstream patches."
 
 requires = []
 
@@ -14,3 +14,5 @@ kotor1_gog_103 = "9C10E0450A6EECA417E036E3CDE7474FED1F0A92AAB018446D156944DEA914
 kotor1_steam_103 = "34E6D971C034222A417995D8E1E8FDD9F8781795C9C289BD86C499A439F34C88"
 kotor1_steam_103_current = "304A212F759F19FFD81D4B3C2F8B95FD73FBCB0BCA9E07C1D898D9FF05F9B775"
 kotor1_cdcrack_103 = "761F9466F456A83909036BAEBB5C43167D722387BE66E54617BA20A8C49E9886"
+kotor2_steam_aspyr = "6A522E71631DCEE93467BD2010F3B23D9145326E1E2E89305F13AB104DBBFFEF"
+kotor2_steam_aspyr_modded = "4AB72FC1AB082F427E008CDA32FC5602D27B4E12FEF48C4A1A2C6F7B2F36FB5A"

@@ -137,9 +137,26 @@ Acceptance:
 
 Goal: bring the feature to the game where the strongest demo exists.
 
+Status: K2 direct-name playback prototype implemented and live-attached on
+2026-07-11. The first visual proof target is now a retargeted Mykal attack on
+`C_DrexlF`, which gives us a small creature-specific test before expanding to
+Mira. Ghidra confirmed `Model::FindAnimation` at `0x004DCF50`,
+`AnimRun::Constructor` at `0x004DCDD0`, and `Gob::PlayAnimation` at
+`0x004E3270`. The K2 Gob local/add-in model offsets are `0x84` and `0x90`.
+The Steam baseline and the active mod-list executable share identical PE
+layout and byte-identical code across all three animation regions.
+
 Tasks:
 
 - Use Odyssey's K2 GOG/Aspyr program at `/TSL/k2_win_gog_aspyr_swkotor2.exe`.
+- Add the confirmed direct-name playback symbols and object offsets to the K2
+  Steam address database. Done for the Drexl proof path.
+- Port the model-scoped `Gob::PlayAnimation` availability gate to K2. Done.
+- Build a mod-preserving `C_Mykal.g0a1 -> C_DrexlF.kpm_drx_a1` probe and a
+  uniquely named `kpm98_drx.utc` fixture. Done.
+- Attach the passive Windows debugger/logger without installing a proxy DLL,
+  and fingerprint the active executable and loaded game-local modules. Done.
+- Prove the retargeted animation visually in `plcaa`. In progress.
 - Locate K2 equivalents for:
   - `UpdateMeleeAttackData`
   - `UpdateRangedAttackData`
@@ -177,7 +194,8 @@ Acceptance:
 ## Risks
 
 - KPM detours cannot call the full original function from C++; hooks must be narrow or fully replace behavior.
-- K2 address databases currently lack the animation symbols locally, so K2 support depends on RE/import work.
+- K2 resolver coverage is still incomplete, although the direct-name playback
+  path required by the Drexl proof is now labelled and implemented.
 - Runtime auto-assigned IDs are unsafe for save stability; release patches should prefer explicit IDs.
 - Server-side combat hooks may have gameplay side effects and should come after client-side proof.
 - Model authoring remains a separate workflow; this patch only makes engine consumers ask for the animation.

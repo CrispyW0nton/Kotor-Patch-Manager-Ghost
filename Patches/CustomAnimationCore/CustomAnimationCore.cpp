@@ -10,6 +10,15 @@
 namespace {
 constexpr uint16_t InvalidAnimationId = 0xffff;
 constexpr size_t LastAnimationNameCapacity = 64;
+constexpr const char* Kotor2SteamAspyrSha =
+    "6A522E71631DCEE93467BD2010F3B23D9145326E1E2E89305F13AB104DBBFFEF";
+constexpr const char* Kotor2SteamAspyrModdedSha =
+    "4AB72FC1AB082F427E008CDA32FC5602D27B4E12FEF48C4A1A2C6F7B2F36FB5A";
+
+struct GobModelOffsets {
+    size_t localModel;
+    size_t addInModel;
+};
 
 using CExoStringAssignFn = void*(__thiscall*)(void* thisPtr, char* value);
 CExoStringAssignFn cExoStringAssign = nullptr;
@@ -127,6 +136,23 @@ void* SafeReadPointer(void* base, size_t offset) {
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return nullptr;
     }
+}
+
+GobModelOffsets GetGobModelOffsets() {
+    const std::string versionSha = GameVersion::GetVersionSha();
+    if (versionSha == Kotor2SteamAspyrSha || versionSha == Kotor2SteamAspyrModdedSha) {
+        return { 0x84, 0x90 };
+    }
+
+    return { 0x58, 0x64 };
+}
+
+void* SafeReadGobLocalModel(void* gob) {
+    return SafeReadPointer(gob, GetGobModelOffsets().localModel);
+}
+
+void* SafeReadGobAddInModel(void* gob) {
+    return SafeReadPointer(gob, GetGobModelOffsets().addInModel);
 }
 
 int32_t SafeReadInt32(void* base, size_t offset) {
@@ -434,7 +460,7 @@ extern "C" void __cdecl LogPlayAnimationRequest(void* gob, const char** animName
 
     rawName = SafeReadCString(rawName);
     const uintptr_t caller = SafeReadReturnAddress(animNameSlot);
-    void* localModel = SafeReadPointer(gob, 0x58);
+    void* localModel = SafeReadGobLocalModel(gob);
     const char* localModelName = SafeReadAnimationName(localModel);
     const char* plannedOverride = CustomAnimationRegistry::Instance()
         .LookupPlayAnimationNameOverrideForModel(localModelName, rawName);
@@ -479,7 +505,7 @@ extern "C" const char* __cdecl ResolvePlayAnimationNameRegisterOverride(const ch
     static LONG registerLogCount = 0;
     const LONG registerLog = InterlockedIncrement(&registerLogCount);
     const char* safeName = SafeReadCString(rawName);
-    void* localModel = SafeReadPointer(gob, 0x58);
+    void* localModel = SafeReadGobLocalModel(gob);
     const char* localModelName = SafeReadAnimationName(localModel);
     const char* overrideName = CustomAnimationRegistry::Instance()
         .LookupPlayAnimationNameOverrideForModel(localModelName, safeName);
@@ -496,7 +522,7 @@ extern "C" const char* __cdecl ResolvePlayAnimationNameRegisterOverride(const ch
         return rawName;
     }
 
-    void* addInModel = SafeReadPointer(gob, 0x64);
+    void* addInModel = SafeReadGobAddInModel(gob);
     void* localAnimation = FindAnimationInModelChain(localModel, overrideName);
     void* addInAnimation = localAnimation ? nullptr : FindAnimationInModelChain(addInModel, overrideName);
     void* resolvedAnimation = localAnimation ? localAnimation : addInAnimation;
@@ -526,6 +552,39 @@ extern "C" const char* __cdecl ResolvePlayAnimationNameRegisterOverride(const ch
         addInModelName ? addInModelName : "<null>"
     );
     return overrideName;
+}
+
+extern "C" void __cdecl OverridePlayAnimationRequest(void* gob, const char** animNameSlot) {
+    const char* rawName = nullptr;
+    __try {
+        rawName = animNameSlot ? *animNameSlot : nullptr;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        rawName = nullptr;
+    }
+
+    const char* resolvedName = ResolvePlayAnimationNameRegisterOverride(rawName, gob);
+    if (!animNameSlot || !resolvedName || resolvedName == rawName) {
+        return;
+    }
+
+    __try {
+        *animNameSlot = resolvedName;
+        debugLog(
+            "[CustomAnimationCore] Gob::PlayAnimation STACK_MAPPED gob=%p slot=%p original=%s resolved=%s\n",
+            gob,
+            animNameSlot,
+            rawName ? rawName : "<null>",
+            resolvedName
+        );
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        debugLog(
+            "[CustomAnimationCore] Gob::PlayAnimation STACK_MAP_FAILED gob=%p slot=%p\n",
+            gob,
+            animNameSlot
+        );
+    }
 }
 
 extern "C" __declspec(naked) void __cdecl OverridePlayAnimationNameRegister() {
@@ -595,8 +654,8 @@ extern "C" void __cdecl LogAnimationExistsLookup(void* target, const char* animN
     const bool shouldLog = ShouldLogInterestingSequence(lookupLog, safeName);
 
     if (shouldLog && IsInterestingAnimationName(safeName)) {
-        void* localModel = SafeReadPointer(target, 0x58);
-        void* addInModel = SafeReadPointer(target, 0x64);
+        void* localModel = SafeReadGobLocalModel(target);
+        void* addInModel = SafeReadGobAddInModel(target);
         void* localAnimation = FindAnimationInModelChain(localModel, safeName);
         void* addInAnimation = localAnimation ? nullptr : FindAnimationInModelChain(addInModel, safeName);
         const char* availability = localAnimation ? "local" : (addInAnimation ? "addin" : "missing");
@@ -744,11 +803,11 @@ void LogGobFindAnimationResult(
 }
 
 extern "C" void __cdecl LogGobFindAnimationAddInResult(void* gob, const char* animName, void* result) {
-    LogGobFindAnimationResult("ADDIN", gob, animName, result, 0x64);
+    LogGobFindAnimationResult("ADDIN", gob, animName, result, GetGobModelOffsets().addInModel);
 }
 
 extern "C" void __cdecl LogGobFindAnimationLocalResult(void* gob, const char* animName, void* result) {
-    LogGobFindAnimationResult("LOCAL", gob, animName, result, 0x58);
+    LogGobFindAnimationResult("LOCAL", gob, animName, result, GetGobModelOffsets().localModel);
 }
 
 void LogAnimationPlayCall(const char* context, void* target, const char* animName) {
@@ -988,7 +1047,14 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
             debugLog("[CustomAnimationCore] ERROR: GameVersion::Initialize() failed\n");
             return FALSE;
         }
-        debugLog("[CustomAnimationCore] Attached\n");
+        {
+            const GobModelOffsets offsets = GetGobModelOffsets();
+            debugLog(
+                "[CustomAnimationCore] Attached (Gob models: local=0x%X addin=0x%X)\n",
+                static_cast<unsigned int>(offsets.localModel),
+                static_cast<unsigned int>(offsets.addInModel)
+            );
+        }
         break;
 
     case DLL_PROCESS_DETACH:

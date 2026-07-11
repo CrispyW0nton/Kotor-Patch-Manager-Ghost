@@ -1,0 +1,23 @@
+{
+  "animation_slot": "kpm_drx_a1",
+  "bone_count_animated": 65,
+  "duration_seconds": 1.5,
+  "errors": [],
+  "fps": 30.0,
+  "frame_count": 31,
+  "input_mdl_sha256": "c2c7ff1ecb6ca3f5b58e1cec9494c9e059808789547d03dc5147924025cc9eaf",
+  "input_size_bytes": 329593,
+  "kotor_output_name_mode": "custom_patch",
+  "manifest_path": "c_drexlf.retarget_preview.json",
+  "operation": "appended_local_override",
+  "output_mdl": "c_drexlf.mdl",
+  "output_mdl_sha256": "6e2484281fecff99aba239ba8b5b23926e4537ecaf43b836e0e74b3782299740",
+  "output_mdx": "c_drexlf.mdx",
+  "output_mdx_sha256": "57f31397fc4b8be1b39f2144320dd940288a25d665d5ea1771a8b13632f7775e",
+  "output_size_bytes": 376548,
+  "phase": "R3B_MDL_INJECTION",
+  "requires_custom_animation_patch": true,
+  "success": true,
+  "vanilla_slot_safe": false,
+  "warnings": []
+}

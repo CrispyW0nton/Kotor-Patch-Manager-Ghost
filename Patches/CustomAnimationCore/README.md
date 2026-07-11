@@ -79,4 +79,9 @@ is currently `kpmwin1`; if it visually A-poses while the same IDs can play
 `dance`, the remaining issue is the exported MDL animation payload rather than
 the KPM hook path.
 
-The prototype currently supports the K1 1.03 GOG and CD crack hashes already used by `ScriptExtender`.
+The prototype supports the existing K1 1.03 targets plus the original K2 Steam
+Aspyr executable. The current development mod list's K2 executable fingerprint
+is also accepted after verifying that its PE layout and the complete
+`Model::FindAnimation`, `AnimRun::Constructor`, and `Gob::PlayAnimation` code
+regions are byte-identical to the original executable. The modded executable's
+unrelated shader/data changes do not move or alter these hooks.

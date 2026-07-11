@@ -221,6 +221,20 @@ if !BUILD_DLL! EQU 1 (
     )
 )
 
+REM Copy optional patch-owned resources while preserving their directory tree.
+REM KPatchCore currently treats these as packaged supplemental files; runtime
+REM tests may stage Override resources from this directory explicitly.
+if exist "additional\" (
+    xcopy "additional" "temp_package\additional\" /E /I /Y >nul
+    if !ERRORLEVEL! NEQ 0 (
+        echo   ERROR: Failed to copy additional patch files
+        rmdir /s /q "temp_package"
+        pause
+        exit /b 1
+    )
+    echo   [OK] additional/
+)
+
 REM Create ZIP archive
 echo   Creating archive...
 cd temp_package
